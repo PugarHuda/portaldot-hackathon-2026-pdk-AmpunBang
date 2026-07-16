@@ -11,9 +11,13 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from scalecodec.base import RuntimeConfigurationObject, ScaleBytes
+from scalecodec.type_registry import load_type_registry_preset
 
 from pdk.core.chain import (
     POT_DECIMALS,
+    _ASSETS_BALANCE_ARG,
+    _fix_assets_balance_width,
     detect_git_bash_mangling,
     normalise_account_uri,
     pot_to_plancks,
@@ -84,3 +88,78 @@ class TestDetectGitBashMangling:
     def test_clean_uri_returns_none(self) -> None:
         assert detect_git_bash_mangling("//Alice") is None
         assert detect_git_bash_mangling("5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty") is None
+
+
+def _offline_runtime_config() -> RuntimeConfigurationObject:
+    """A scalecodec runtime config built from bundled presets only — no node
+    needed. Enough to exercise `_fix_assets_balance_width`'s pure byte
+    surgery in isolation."""
+    rc = RuntimeConfigurationObject()
+    rc.update_type_registry(load_type_registry_preset("core"))
+    return rc
+
+
+class _FakeSubstrate:
+    """Stand-in for SubstrateInterface: `_fix_assets_balance_width` only
+    touches `.runtime_config`."""
+
+    def __init__(self) -> None:
+        self.runtime_config = _offline_runtime_config()
+
+
+class _FakeCall:
+    """Stand-in for GenericCall: `_fix_assets_balance_width` only reads/
+    reassigns `.data`."""
+
+    def __init__(self, data: ScaleBytes) -> None:
+        self.data = data
+
+
+class TestFixAssetsBalanceWidth:
+    """Regression coverage for the `Assets.create` "bad signature" bug:
+    substrate-interface encodes `min_balance` (metadata type `T::Balance`,
+    stripped to the ambiguous bare name `Balance`) as u128 (16 bytes)
+    instead of the runtime's actual u64 (8 bytes) — verified byte-for-byte
+    against @polkadot/api and against a live Portaldot dev node, where the
+    unpatched call is rejected at the RPC layer with "Invalid Transaction:
+    bad signature" (1010) before it ever reaches dispatch."""
+
+    def test_corrects_u128_tail_to_u64(self) -> None:
+        substrate = _FakeSubstrate()
+        prefix = b"\x1a\x00\x96\xfe\x3c\x00\x00"  # arbitrary call_index + id bytes
+        wrong_tail = bytes(substrate.runtime_config.create_scale_object("u128").encode(1).data)
+        call = _FakeCall(ScaleBytes(prefix + wrong_tail))
+
+        fixed = _fix_assets_balance_width(substrate, call, 1)
+
+        correct_tail = bytes(substrate.runtime_config.create_scale_object("u64").encode(1).data)
+        assert bytes(fixed.data.data) == prefix + correct_tail
+        assert len(fixed.data.data) == len(prefix) + 8  # 8 bytes shorter than the broken 16-byte tail
+
+    def test_preserves_the_signed_value(self) -> None:
+        substrate = _FakeSubstrate()
+        value = 999_888_777
+        wrong_tail = bytes(substrate.runtime_config.create_scale_object("u128").encode(value).data)
+        call = _FakeCall(ScaleBytes(b"" + wrong_tail))
+
+        fixed = _fix_assets_balance_width(substrate, call, value)
+
+        assert int.from_bytes(bytes(fixed.data.data), "little") == value
+
+    def test_refuses_to_patch_an_unrecognised_shape(self) -> None:
+        # Guards against silently mis-signing if a future metadata/runtime
+        # change makes this assumption stale — better a loud error than a
+        # quietly wrong signature.
+        substrate = _FakeSubstrate()
+        call = _FakeCall(ScaleBytes(b"\x00\x01\x02"))
+
+        with pytest.raises(RuntimeError, match="no longer matches"):
+            _fix_assets_balance_width(substrate, call, 1)
+
+    def test_only_create_is_patched(self) -> None:
+        # mint/transfer's `amount` is `Compact<Balance>`: compact encoding
+        # is width-agnostic for any value fitting in a u64, so the same
+        # u128-vs-u64 ambiguity produces identical bytes either way and
+        # doesn't need (or want) this patch — verified live against mint
+        # and transfer, which sign and dispatch correctly unpatched.
+        assert _ASSETS_BALANCE_ARG == {"create": "min_balance"}
