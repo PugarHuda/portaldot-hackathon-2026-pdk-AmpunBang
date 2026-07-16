@@ -226,3 +226,860 @@ balances.TooManyReserves:
   summary: "The account already holds the maximum number of named reserves (MaxReserves)."
   steps:
     - "Release an existing reserve before creating a new one."
+
+# --- error-gap-closing pass: standard FRAME pallet errors ------------------
+# Sourced from paritytech/substrate tag monthly-2021-08 (frame/<pallet>/src/lib.rs
+# Error enum doc comments), which matches every missing variant NAME in
+# error_index.json exactly for every pallet below -- see CONTRIBUTING.md history
+# / PR description for the verification method.
+
+# --- assets -------------------------------------------------------------------
+assets.BadWitness:
+  summary: "The witness data supplied (account/sufficient/approval counts) no longer matches the asset's current state."
+  steps:
+    - "Re-query the asset's current stats right before calling `assets.destroy` and pass fresh witness counts."
+    - "Retry immediately after refreshing the witness -- it goes stale if other transactions land first."
+
+assets.MinBalanceZero:
+  summary: "The asset's minimum balance (min_balance) was set to zero, but it must be greater than zero."
+  steps:
+    - "Pass a non-zero `min_balance` when calling `assets.create` or `assets.forceCreate`."
+
+assets.BadMetadata:
+  summary: "The asset metadata (name or symbol) supplied to `assets.setMetadata` is invalid, e.g. too long."
+  steps:
+    - "Shorten the name/symbol to fit the runtime's configured metadata length limits."
+    - "Check `assets.metadata(assetId)` for the current values before retrying."
+
+# --- authorship ---------------------------------------------------------------
+authorship.InvalidUncleParent:
+  summary: "The reported uncle block's parent isn't part of this chain's history, so it can't be recorded as a valid uncle."
+  steps:
+    - "This is set by the node's block-authoring logic when it submits uncles, not by a signed extrinsic -- check the authoring node's uncle-selection code if you're running a custom collator."
+    - "Regular account transactions never trigger this."
+
+authorship.UnclesAlreadySet:
+  summary: "This block already recorded its uncles once; `authorship.setUncles` can only run a single time per block."
+  steps:
+    - "This is an internal inherent, not something to call twice -- a custom node/collator should only submit uncles once per block."
+
+authorship.TooManyUncles:
+  summary: "More uncle blocks were submitted than the runtime allows per block."
+  steps:
+    - "Trim the uncle list down to the runtime's configured maximum before submitting."
+
+authorship.GenesisUncle:
+  summary: "The genesis block was submitted as an uncle, which isn't allowed."
+  steps:
+    - "Exclude the genesis block from the uncle list -- it can never be a valid uncle."
+
+authorship.TooHighUncle:
+  summary: "The submitted uncle's block number is not lower than the current block, so it can't be a valid uncle."
+  steps:
+    - "Only submit uncles whose block number is behind the current block within the allowed depth."
+
+authorship.UncleAlreadyIncluded:
+  summary: "This block was already counted as an uncle earlier in the chain, so it can't be recorded again."
+  steps:
+    - "De-duplicate the uncle list -- each block can only be claimed as an uncle once."
+
+authorship.OldUncle:
+  summary: "The uncle block is older than the runtime's allowed uncle-generation depth."
+  steps:
+    - "Only submit uncles within the recent-block window the runtime allows (`UncleGenerations`)."
+
+# --- babe ---------------------------------------------------------------------
+babe.InvalidEquivocationProof:
+  summary: "The submitted proof that a BABE validator equivocated (signed two blocks in the same slot) doesn't check out."
+  steps:
+    - "Regenerate the equivocation proof from the two conflicting block headers -- it must match the validator's key and slot exactly."
+    - "This is a validator-misbehavior report, not a normal user call; double check your tooling built the report correctly."
+
+babe.InvalidKeyOwnershipProof:
+  summary: "The proof that the reported session key belongs to the accused validator failed to verify."
+  steps:
+    - "Fetch a fresh key-ownership proof for that session/key pair from the node before resubmitting the report."
+
+babe.DuplicateOffenceReport:
+  summary: "This equivocation was already reported and processed once -- reporting it again is redundant."
+  steps:
+    - "No action needed; check `pdk storage` or the explorer for the existing report instead of resubmitting."
+
+# --- bounties -----------------------------------------------------------------
+bounties.InsufficientProposersBalance:
+  summary: "The proposer doesn't have enough free POT to cover the bounty deposit."
+  steps:
+    - "Fund the proposer account with enough POT to cover the bounty's required deposit before calling `bounties.proposeBounty`."
+
+bounties.InvalidIndex:
+  summary: "No bounty exists at the index you supplied."
+  steps:
+    - "Check `bounties.bounties` (or the explorer) for valid bounty indices before calling."
+
+bounties.ReasonTooBig:
+  summary: "The bounty's description ('reason') is longer than the runtime allows."
+  steps:
+    - "Shorten the reason text to fit `MaximumReasonLength`, or store the long description off-chain and link it instead."
+
+bounties.UnexpectedStatus:
+  summary: "The bounty isn't in the right state for this action (e.g. trying to award a bounty that isn't funded yet)."
+  steps:
+    - "Check the bounty's current status with `bounties.bounties(index)` and only call actions valid for that state."
+
+bounties.RequireCurator:
+  summary: "This call can only be made by the bounty's curator, and no curator signed it."
+  steps:
+    - "Sign with the account assigned as curator via `bounties.proposeCurator` / `acceptCurator`."
+
+bounties.InvalidValue:
+  summary: "The bounty's funding value doesn't meet the runtime's minimum bounty value."
+  steps:
+    - "Propose the bounty with a value at or above `BountyValueMinimum`."
+
+bounties.InvalidFee:
+  summary: "The proposed curator fee is invalid, e.g. larger than the bounty value itself."
+  steps:
+    - "Propose a curator fee that's less than or equal to the bounty's total value."
+
+bounties.PendingPayout:
+  summary: "This bounty already has a payout in motion, so it can't be closed directly."
+  steps:
+    - "Call `bounties.unassignCurator` to slash/unassign the curator first, then retry closing the bounty."
+
+bounties.Premature:
+  summary: "The bounty's payout countdown (the curator's unlock delay) hasn't finished yet."
+  steps:
+    - "Wait until the bounty's unlock block is reached before claiming the payout."
+
+# --- contracts ----------------------------------------------------------------
+contracts.InvalidScheduleVersion:
+  summary: "The new weight schedule submitted has a version that isn't greater than the one already active."
+  steps:
+    - "This is a governance/root-only maintenance call -- bump the schedule's version number above the current one before resubmitting."
+
+contracts.InvalidSurchargeClaim:
+  summary: "The `claim_surcharge` call was submitted with an origin/auxiliary-sender combination the runtime doesn't accept."
+  steps:
+    - "Call `claim_surcharge` as a signed extrinsic without an auxiliary sender -- that combination is inherent-only."
+
+contracts.InvalidSourceContract:
+  summary: "The contract you're restoring FROM doesn't exist or isn't a tombstone."
+  steps:
+    - "Check the source contract's address is a real, evicted (tombstoned) contract before calling `restore_to`."
+
+contracts.InvalidDestinationContract:
+  summary: "The contract you're restoring TO must be a tombstone too -- it either doesn't exist or is still alive."
+  steps:
+    - "Only restore into a contract address that has already been evicted into a tombstone, not a live or missing one."
+
+contracts.InvalidTombstone:
+  summary: "The source and destination tombstone hashes don't match, so the restore was rejected."
+  steps:
+    - "Verify the code hash and storage root you're restoring with match the destination's original tombstone exactly."
+
+contracts.OutputBufferTooSmall:
+  summary: "The buffer supplied to hold a contract API call's output was too small for the actual result."
+  steps:
+    - "Increase the output buffer size in the calling (host-side) code to fit the largest expected return value."
+
+contracts.BelowSubsistenceThreshold:
+  summary: "The transfer would drop the contract's balance below the subsistence threshold, which isn't allowed without going through termination."
+  steps:
+    - "Leave the contract with at least the subsistence threshold balance, or call `terminate` explicitly if you intend to remove it without a tombstone."
+
+contracts.NewContractNotFunded:
+  summary: "The new contract ended up with less than the subsistence threshold balance right after its constructor ran."
+  steps:
+    - "Send enough POT with `instantiate`/`instantiateWithCode` to leave the new contract above the subsistence threshold."
+
+contracts.TransferFailed:
+  summary: "The contract's internal transfer failed, usually because the sending account's balance is too low or is locked."
+  steps:
+    - "Check the contract's free (unlocked) balance before the call and fund it if needed."
+
+contracts.ContractIsTombstone:
+  summary: "The target address is a tombstone (an evicted contract), which can't be called directly."
+  steps:
+    - "Use `restore_to` to revive the tombstoned contract before calling it, or target a live contract instead."
+
+contracts.RentNotPaid:
+  summary: "The contract ran out of balance to pay its ongoing storage rent and is now eligible for eviction."
+  steps:
+    - "Send POT to the contract to top up its balance so it can keep paying rent."
+    - "Anyone can call `claim_surcharge` to formally evict it into a tombstone if it isn't topped up."
+
+contracts.OutOfBounds:
+  summary: "The contract passed a memory pointer/length outside its own sandbox memory to a host API call."
+  steps:
+    - "This is a contract-code bug, not a caller-side fix -- rebuild the contract with a corrected pointer/length passed to the host function."
+
+contracts.DecodingFailed:
+  summary: "The data passed into a contract API call couldn't be decoded into the type the API expected."
+  steps:
+    - "Check the SCALE encoding of the arguments passed to the contract call/API -- it must match the expected type exactly."
+
+contracts.ValueTooLarge:
+  summary: "A value written to contract storage is larger than the runtime's `MaxValueSize` limit."
+  steps:
+    - "Shrink the stored value, or split it across multiple storage keys."
+
+contracts.ReentranceDenied:
+  summary: "The call tried to re-enter a contract that has marked itself as non-reentrant."
+  steps:
+    - "Restructure the call graph so this contract isn't called again while it's already executing on the stack."
+
+contracts.RandomSubjectTooLong:
+  summary: "The subject/seed passed to the contract's `random` API call is longer than the runtime allows."
+  steps:
+    - "Shorten the subject bytes passed to `seal_random` in the contract code."
+
+contracts.TooManyTopics:
+  summary: "The contract tried to emit an event with more topics than the runtime allows."
+  steps:
+    - "Reduce the number of topics passed when emitting the contract event."
+
+contracts.DuplicateTopics:
+  summary: "The contract's event topics list contains a duplicate entry, which isn't allowed."
+  steps:
+    - "De-duplicate the topics list before emitting the event."
+
+contracts.NoChainExtension:
+  summary: "The contract calls a chain extension, but this runtime doesn't have one configured."
+  steps:
+    - "Remove the chain-extension call from the contract, or deploy to a runtime that has `ChainExtension` configured."
+
+contracts.DeletionQueueFull:
+  summary: "The contract-deletion queue is full right now, so this contract couldn't be queued for removal."
+  steps:
+    - "Wait a block or two for the queue to drain, then retry the call."
+
+contracts.ContractNotEvictable:
+  summary: "`claim_surcharge` failed because the contract actually has enough balance to keep paying rent -- it isn't eligible for eviction."
+  steps:
+    - "No action needed if the contract is healthy; if you intended to remove it, call `terminate` from the contract itself instead."
+
+contracts.DuplicateContract:
+  summary: "A contract already exists at the address you're trying to instantiate into."
+  steps:
+    - "Use a different salt (for `instantiate`) so the derived contract address is unique."
+
+contracts.TerminatedInConstructor:
+  summary: "The contract called self-destruct (or restore) from inside its own constructor, which isn't allowed."
+  steps:
+    - "Remove the `terminate`/`restore_to` call from the constructor -- a contract can't destroy itself before it finishes being created."
+
+contracts.DebugMessageInvalidUTF8:
+  summary: "The contract's debug message contains bytes that aren't valid UTF-8 text."
+  steps:
+    - "Make sure the debug string passed to `seal_debug_message` is valid UTF-8 before deploying."
+
+contracts.TerminatedWhileReentrant:
+  summary: "The contract tried to terminate (self-destruct) itself while it's still active on the call stack, e.g. inside a reentrant call."
+  steps:
+    - "Only call `terminate`/`restore_to` when the contract isn't currently mid-call on the stack -- move it out of the reentrant path."
+
+contracts.InputForwarded:
+  summary: "This contract's input was already forwarded to a sub-call, so it can't be read again."
+  steps:
+    - "Read/cache the input before making a forwarding `call` -- once forwarded it's consumed."
+
+# --- election provider multi-phase --------------------------------------------
+electionprovidermultiphase.PreDispatchEarlySubmission:
+  summary: "An unsigned solution was submitted before the signed submission phase ended."
+  steps:
+    - "Wait until the signed phase closes before submitting an unsigned (validator) solution."
+
+electionprovidermultiphase.PreDispatchWrongWinnerCount:
+  summary: "The submitted election solution doesn't have the exact number of winners the runtime expects."
+  steps:
+    - "Regenerate the solution against the current desired-targets count before submitting."
+
+electionprovidermultiphase.PreDispatchWeakSubmission:
+  summary: "The submitted solution's score is worse than the best one already queued, so it was rejected."
+  steps:
+    - "Only submit if your solution's score beats the current best -- check the queued solution's score first."
+
+electionprovidermultiphase.OcwCallWrongEra:
+  summary: "The off-chain worker submitted a solution tagged for the wrong election round."
+  steps:
+    - "Make sure the off-chain worker reads the current round via `electionProviderMultiPhase.round` before building and submitting a solution."
+
+electionprovidermultiphase.CallNotAllowed:
+  summary: "This election call isn't valid in the current phase (off/signed/unsigned/emergency)."
+  steps:
+    - "Check `electionProviderMultiPhase.currentPhase` and only call the action that's valid for that phase."
+
+# --- gilt ---------------------------------------------------------------------
+gilt.DurationTooSmall:
+  summary: "The bid's duration was zero (or less), but it must be at least one period."
+  steps:
+    - "Pass a duration of at least 1 when calling `gilt.placeBid`."
+
+gilt.DurationTooBig:
+  summary: "The bid's duration is longer than the number of duration queues the runtime supports."
+  steps:
+    - "Lower the bid duration to at most `QueueCount`."
+
+gilt.AmountTooSmall:
+  summary: "The bid amount is below the minimum the runtime allows for a gilt bid."
+  steps:
+    - "Increase the bid amount to at least `MinFreeze`."
+
+gilt.BidTooLow:
+  summary: "That duration's bid queue is full, and your bid isn't large enough to bump out the smallest existing bid."
+  steps:
+    - "Increase the bid amount above the queue's current smallest bid, or pick a duration whose queue isn't full."
+
+gilt.Unknown:
+  summary: "No gilt exists at the index you supplied."
+  steps:
+    - "Check `gilt.active` for valid gilt indices before calling."
+
+gilt.NotOwner:
+  summary: "You don't own this gilt, so you can't act on it."
+  steps:
+    - "Sign with the account that originally placed the bid and owns this gilt."
+
+gilt.NotExpired:
+  summary: "This gilt hasn't reached its expiry block yet, so it can't be thawed."
+  steps:
+    - "Wait until the gilt's expiry block before calling `gilt.thaw`."
+
+gilt.NotFound:
+  summary: "No matching bid was found to retract."
+  steps:
+    - "Double check the duration and amount match an existing queued bid exactly before calling `retractBid`."
+
+# --- grandpa ------------------------------------------------------------------
+grandpa.PauseFailed:
+  summary: "GRANDPA is already paused (or a pause is already pending), so this pause request was rejected."
+  steps:
+    - "Check the current GRANDPA state before signaling another pause -- this is a root/governance-only call."
+
+grandpa.ResumeFailed:
+  summary: "GRANDPA isn't currently paused, so there's nothing to resume."
+  steps:
+    - "Only call resume while GRANDPA is actually paused."
+
+grandpa.ChangePending:
+  summary: "There's already a pending GRANDPA authority-set change, so another one can't be scheduled yet."
+  steps:
+    - "Wait for the pending authority change to apply before scheduling a new one."
+
+grandpa.TooSoon:
+  summary: "A forced GRANDPA authority change was requested too soon after the previous one."
+  steps:
+    - "Wait for the runtime's minimum delay between forced changes to pass before retrying."
+
+grandpa.InvalidKeyOwnershipProof:
+  summary: "The proof that the reported session key belongs to the accused GRANDPA validator failed to verify."
+  steps:
+    - "Fetch a fresh key-ownership proof for that session/key pair before resubmitting the report."
+
+grandpa.InvalidEquivocationProof:
+  summary: "The submitted proof that a GRANDPA validator equivocated (voted twice in the same round) doesn't check out."
+  steps:
+    - "Regenerate the equivocation proof from the two conflicting votes -- it must match the validator's key and round exactly."
+
+grandpa.DuplicateOffenceReport:
+  summary: "This GRANDPA equivocation was already reported and processed once."
+  steps:
+    - "No action needed; check `pdk storage` or the explorer for the existing report instead of resubmitting."
+
+# --- identity -----------------------------------------------------------------
+identity.TooManySubAccounts:
+  summary: "This account already has the maximum number of sub-accounts allowed."
+  steps:
+    - "Remove an existing sub-account before adding a new one."
+
+identity.NotNamed:
+  summary: "This account hasn't set a display name/identity, so it can't be named as a sub yet."
+  steps:
+    - "Set an identity with `identity.setIdentity` on the parent account first."
+
+identity.EmptyIndex:
+  summary: "No registrar exists at the index you supplied."
+  steps:
+    - "Check `identity.registrars` for valid registrar indices before calling."
+
+identity.FeeChanged:
+  summary: "The registrar's judgement fee changed since you requested judgement, so the payment no longer matches."
+  steps:
+    - "Re-check the registrar's current fee with `identity.registrars` and resubmit `requestJudgement` with the updated fee."
+
+identity.NoIdentity:
+  summary: "This account has no identity set yet."
+  steps:
+    - "Call `identity.setIdentity` to register an identity before requesting judgement or adding subs."
+
+identity.StickyJudgement:
+  summary: "This identity has a judgement that's locked in (sticky) and can't be cleared or changed right now."
+  steps:
+    - "A sticky judgement can only be removed by the registrar that gave it, or by clearing the whole identity."
+
+identity.JudgementGiven:
+  summary: "A registrar has already given judgement on this identity, so this action (e.g. cancelling the request) is no longer possible."
+  steps:
+    - "You can't cancel a request once judgement has been given -- clear and re-register the identity if you need to start over."
+
+identity.InvalidJudgement:
+  summary: "The judgement value supplied isn't valid for this call."
+  steps:
+    - "Use a judgement variant that's valid for this specific call -- check the identity pallet's judgement enum."
+
+identity.InvalidIndex:
+  summary: "The registrar index you supplied doesn't exist."
+  steps:
+    - "Look up the correct registrar index with `identity.registrars` before calling."
+
+identity.InvalidTarget:
+  summary: "The target account for this identity call isn't valid (e.g. it isn't a sub-identity of the signer)."
+  steps:
+    - "Double check the target address is actually linked to your identity before calling."
+
+identity.TooManyFields:
+  summary: "The identity info has more additional fields than the runtime allows."
+  steps:
+    - "Remove some additional fields from the identity info before calling `setIdentity`."
+
+identity.AlreadyClaimed:
+  summary: "This account is already claimed as a sub-identity somewhere else."
+  steps:
+    - "Remove the account from its existing parent identity before adding it as a sub here."
+
+identity.NotSub:
+  summary: "The signer isn't registered as anyone's sub-account, so this sub-account action doesn't apply."
+  steps:
+    - "Only call this from an account that's actually a registered sub of a parent identity."
+
+identity.NotOwned:
+  summary: "The sub-account you referenced doesn't belong to the signing account."
+  steps:
+    - "Only manage sub-accounts that were added under your own identity."
+
+# --- im-online ----------------------------------------------------------------
+imonline.InvalidKey:
+  summary: "The heartbeat was signed with a session key that isn't registered for this validator."
+  steps:
+    - "Make sure the node's session keys are set on-chain via `session.setKeys` before it starts sending heartbeats."
+
+imonline.DuplicatedHeartbeat:
+  summary: "A heartbeat for this validator and session was already submitted."
+  steps:
+    - "No action needed -- only one heartbeat per validator per session is expected; duplicates are just ignored."
+
+# --- indices ------------------------------------------------------------------
+indices.NotAssigned:
+  summary: "No account is currently assigned to this index."
+  steps:
+    - "Check `indices.accounts` to confirm the index is actually assigned before calling."
+
+indices.NotOwner:
+  summary: "This index belongs to a different account than the one signing."
+  steps:
+    - "Sign with the account that actually owns this index, or only act on indices you hold."
+
+indices.InUse:
+  summary: "This index is already claimed by another account."
+  steps:
+    - "Pick a different, unclaimed index, or check `indices.accounts` to find a free one."
+
+indices.NotTransfer:
+  summary: "You tried to transfer an index to the same account that already owns it."
+  steps:
+    - "Target a different destination account for the transfer."
+
+indices.Permanent:
+  summary: "This index was made permanent, so it can't be freed or transferred."
+  steps:
+    - "A permanent index is locked forever by design -- there's no way to reverse it."
+
+# --- lottery ------------------------------------------------------------------
+lottery.NotConfigured:
+  summary: "No lottery has been set up yet, so this call has nothing to act on."
+  steps:
+    - "Have the manager account call `lottery.setConfig` (usually via sudo/governance) to configure a lottery first."
+
+lottery.InProgress:
+  summary: "A lottery is already running, so it can't be reconfigured or started again right now."
+  steps:
+    - "Wait for the current lottery to finish (or call `stop`) before starting/configuring a new one."
+
+lottery.AlreadyEnded:
+  summary: "This lottery has already ended, so entries are no longer accepted."
+  steps:
+    - "Wait for the manager to configure and start a new lottery."
+
+lottery.InvalidCall:
+  summary: "The call you tried to enter into the lottery isn't one of the calls this lottery allows."
+  steps:
+    - "Only submit calls that are in the lottery's configured `CallIndices` list."
+
+lottery.AlreadyParticipating:
+  summary: "You've already entered the lottery with this exact call, so it won't count twice."
+  steps:
+    - "Use a different qualifying call to buy another ticket -- repeating the same one doesn't add entries."
+
+lottery.TooManyCalls:
+  summary: "The lottery configuration lists more qualifying calls than the runtime allows."
+  steps:
+    - "Reduce the number of calls passed to `lottery.setConfig`."
+
+lottery.EncodingFailed:
+  summary: "The lottery's configured calls failed to SCALE-encode internally."
+  steps:
+    - "Double check the call list passed to `setConfig` is well-formed and within size limits."
+
+# --- multisig -----------------------------------------------------------------
+multisig.MinimumThreshold:
+  summary: "The multisig threshold must be at least 2 signatories."
+  steps:
+    - "Pass a threshold of 2 or more when creating the multisig call."
+
+multisig.AlreadyApproved:
+  summary: "This signatory already approved this multisig call -- approving again is redundant."
+  steps:
+    - "Wait for other signatories to approve, or check `multisig.multisigs` to see the current approval count."
+
+multisig.NoApprovalsNeeded:
+  summary: "This call already has enough approvals and doesn't need yours."
+  steps:
+    - "No action needed -- the multisig call is already fully approved and will execute (or already has)."
+
+multisig.TooFewSignatories:
+  summary: "The signatory list is too short -- a multisig needs at least 2 other signatories besides the sender."
+  steps:
+    - "Add more accounts to the `other_signatories` list."
+
+multisig.TooManySignatories:
+  summary: "The signatory list is longer than the runtime's `MaxSignatories` limit."
+  steps:
+    - "Trim the signatory list down to the runtime's maximum."
+
+multisig.SignatoriesOutOfOrder:
+  summary: "The `other_signatories` list must be sorted, and this one wasn't."
+  steps:
+    - "Sort the signatory addresses before submitting (ascending order)."
+
+multisig.SenderInSignatories:
+  summary: "The signing account was also included in the `other_signatories` list, which isn't allowed."
+  steps:
+    - "Remove the sender's own address from the `other_signatories` list."
+
+multisig.NoTimepoint:
+  summary: "This multisig call is already in progress, so you must supply the original timepoint to approve it."
+  steps:
+    - "Pass the `maybe_timepoint` from the call that first created this multisig operation."
+
+multisig.WrongTimepoint:
+  summary: "The timepoint you supplied doesn't match the one this multisig operation actually started at."
+  steps:
+    - "Look up the correct timepoint via `multisig.multisigs(account, callHash)` and use that exact value."
+
+multisig.UnexpectedTimepoint:
+  summary: "You supplied a timepoint, but there's no in-progress multisig operation for this call hash yet."
+  steps:
+    - "Omit the timepoint on the call that creates the first approval -- only later approvals need it."
+
+multisig.MaxWeightTooLow:
+  summary: "The `max_weight` you supplied is lower than the actual weight the wrapped call needs."
+  steps:
+    - "Increase `max_weight` to at least the wrapped call's real weight (dry-run it first if unsure)."
+
+multisig.AlreadyStored:
+  summary: "This exact multisig call data has already been stored on-chain."
+  steps:
+    - "No need to resubmit the call data -- just approve using the existing stored call hash."
+
+# --- proxy --------------------------------------------------------------------
+proxy.TooMany:
+  summary: "This account has hit the maximum number of proxies (or pending announcements) the runtime allows."
+  steps:
+    - "Remove an existing proxy (or announcement) before adding a new one."
+
+proxy.NotFound:
+  summary: "No matching proxy registration exists for this account/delegate/type combination."
+  steps:
+    - "Check `proxy.proxies(account)` for the exact registered proxies before calling `removeProxy`."
+
+proxy.Unproxyable:
+  summary: "This proxy's type doesn't permit the call you tried to make through it."
+  steps:
+    - "Use a proxy type that allows this call (e.g. `Any` instead of a restricted type like `NonTransfer`)."
+
+proxy.Duplicate:
+  summary: "This account is already registered as a proxy of this type for the target."
+  steps:
+    - "No need to add it again -- check `proxy.proxies` to confirm it's already set up."
+
+proxy.NoPermission:
+  summary: "This call can't be made through a proxy because it could let the proxy escalate its own privileges."
+  steps:
+    - "Send this call directly from the real account instead of through a proxy."
+
+proxy.Unannounced:
+  summary: "This proxy call needed a prior announcement, and none exists (or it wasn't made long enough ago)."
+  steps:
+    - "Call `proxy.announce` first and wait the required delay before executing the proxied call."
+
+proxy.NoSelfProxy:
+  summary: "An account can't register itself as its own proxy."
+  steps:
+    - "Use a different delegate account than the one you're adding the proxy for."
+
+# --- scheduler ----------------------------------------------------------------
+scheduler.FailedToSchedule:
+  summary: "The runtime couldn't schedule this call, usually because the target block/slot is already full."
+  steps:
+    - "Try a different block number, or reduce how many calls are scheduled into that slot."
+
+scheduler.NotFound:
+  summary: "No scheduled call exists at the name/address you referenced."
+  steps:
+    - "Check `scheduler.agenda` for the correct block and index before cancelling."
+
+scheduler.RescheduleNoChange:
+  summary: "You tried to reschedule a call to the exact same block it's already scheduled for."
+  steps:
+    - "Pass a different target block number than the one it's currently scheduled at."
+
+# --- session ------------------------------------------------------------------
+session.InvalidProof:
+  summary: "The proof that you own these session keys doesn't verify."
+  steps:
+    - "Regenerate the ownership proof from `author_rotateKeys` on the node and resubmit `session.setKeys` with it."
+
+session.NoAssociatedValidatorId:
+  summary: "This account has no validator ID associated with it, so session keys can't be set."
+  steps:
+    - "Make sure the account is registered as a validator/controller before calling `setKeys`."
+
+session.DuplicatedKey:
+  summary: "One of these session keys is already registered to another validator."
+  steps:
+    - "Generate a fresh set of session keys (`author_rotateKeys`) -- each key must be unique across validators."
+
+session.NoKeys:
+  summary: "This account hasn't set any session keys yet."
+  steps:
+    - "Call `session.setKeys` with keys generated via `author_rotateKeys` before this action."
+
+session.NoAccount:
+  summary: "The account setting these keys doesn't exist on-chain yet (needs the existential deposit)."
+  steps:
+    - "Fund the account with at least the existential deposit first, then call `setKeys`."
+
+# --- staking ------------------------------------------------------------------
+staking.AlreadyClaimed:
+  summary: "Staking rewards for this validator and era were already claimed."
+  steps:
+    - "No need to claim again -- check the explorer or `staking.claimedRewards` for the existing payout instead."
+
+staking.AlreadyPaired:
+  summary: "This controller account is already paired with a different stash."
+  steps:
+    - "Use a controller account that isn't already bonded to another stash, or unbond the old pairing first."
+
+staking.BadState:
+  summary: "The staking ledger for this account is in an inconsistent internal state."
+  steps:
+    - "This points at corrupted staking state -- inspect the account's ledger via `pdk storage Staking Ledger`; it usually isn't fixable client-side."
+
+staking.BadTarget:
+  summary: "One of the nomination targets isn't a valid, un-blocked validator."
+  steps:
+    - "Remove that address from the target list, or confirm it's an active validator via `staking.validators`."
+
+staking.CannotChillOther:
+  summary: "This stash still has enough bond, so it can't be force-chilled by someone else."
+  steps:
+    - "Only the stash/controller can chill themselves while they still meet the minimum bond -- force-chilling only applies to under-bonded accounts."
+
+staking.DuplicateIndex:
+  summary: "The same slashing-span index was supplied more than once."
+  steps:
+    - "De-duplicate the span indices before calling."
+
+staking.FundedTarget:
+  summary: "You tried to remove/reap a stash that still has staking funds bonded."
+  steps:
+    - "Fully unbond and withdraw the stash's funds before it can be reaped."
+
+staking.IncorrectHistoryDepth:
+  summary: "The history-depth value passed doesn't match the runtime's actual configured value."
+  steps:
+    - "Pass the current `HistoryDepth` value from the runtime, not a guessed or old one."
+
+staking.IncorrectSlashingSpans:
+  summary: "The number of slashing spans supplied doesn't match how many the stash actually has on-chain."
+  steps:
+    - "Query `staking.slashingSpans(stash)` for the real count and pass that number."
+
+staking.InvalidEraToReward:
+  summary: "The era you're claiming a payout for is either too old, too new, or not yet finished."
+  steps:
+    - "Only claim payouts for a completed era within the configured `HistoryDepth` window."
+
+staking.InvalidNumberOfNominations:
+  summary: "The number of validators you're nominating is outside the allowed range (zero or over the max)."
+  steps:
+    - "Nominate between 1 and `MaxNominations` validators."
+
+staking.InvalidSlashIndex:
+  summary: "The slash index you supplied doesn't exist for this slashing span."
+  steps:
+    - "Look up the valid slash indices via `staking.slashingSpans` before calling."
+
+staking.NoMoreChunks:
+  summary: "This stash already has the maximum number of pending unbonding chunks."
+  steps:
+    - "Wait for an existing unlock chunk to mature (`withdrawUnbonded`) before unbonding again."
+
+staking.NotSortedAndUnique:
+  summary: "The list you supplied must be sorted with no duplicates, and this one isn't."
+  steps:
+    - "Sort the list and remove duplicates before submitting."
+
+staking.NoUnlockChunk:
+  summary: "There's nothing unbonding right now, so there's no chunk to rebond."
+  steps:
+    - "Only call `rebond` after you've called `unbond` and have a pending unlock chunk."
+
+staking.TooManyNominators:
+  summary: "The nominator pool is already at the runtime's maximum size."
+  steps:
+    - "No client-side fix -- the runtime caps total nominators; wait for a slot to free up or for governance to raise the limit."
+
+staking.TooManyTargets:
+  summary: "You nominated more validators than the runtime's per-call maximum."
+  steps:
+    - "Trim the nomination list down to the runtime's max targets per call."
+
+staking.TooManyValidators:
+  summary: "The validator set is already at the runtime's maximum size."
+  steps:
+    - "No client-side fix -- the runtime caps total validators; wait for a slot to free up or for governance to raise the limit."
+
+# --- system -------------------------------------------------------------------
+system.InvalidSpecName:
+  summary: "The runtime upgrade's spec name doesn't match the chain's current spec name."
+  steps:
+    - "Only upgrade to a Wasm blob built for this exact chain (same `spec_name`) -- this is a root-only `system.setCode` guard."
+
+system.SpecVersionNeedsToIncrease:
+  summary: "The new runtime's spec version must be higher than the current one, and it wasn't."
+  steps:
+    - "Bump `spec_version` in the runtime being deployed before submitting the upgrade."
+
+system.FailedToExtractRuntimeVersion:
+  summary: "The runtime upgrade Wasm doesn't expose a readable version -- the blob is likely corrupted or malformed."
+  steps:
+    - "Rebuild the runtime Wasm and confirm `Core_version` returns correctly before resubmitting the upgrade."
+
+system.NonDefaultComposite:
+  summary: "The account still has non-default data (e.g. non-zero balance fields) attached, so it can't be fully removed."
+  steps:
+    - "Make sure all balances and other AccountData fields are fully zeroed before the account can be reaped."
+
+system.NonZeroRefCount:
+  summary: "Something else on-chain still references this account, so it can't be purged yet."
+  steps:
+    - "Release whatever's holding a reference on the account (e.g. proxies, identity, staking bonds) before it can be removed."
+
+# --- transaction storage ------------------------------------------------------
+transactionstorage.InsufficientFunds:
+  summary: "The signer doesn't have enough POT to pay for storing this transaction's data."
+  steps:
+    - "Fund the account with enough POT to cover the storage fee before calling `store`."
+
+transactionstorage.NotConfigured:
+  summary: "Transaction storage hasn't been configured on this runtime yet."
+  steps:
+    - "This needs a root/governance call to set the storage period configuration first."
+
+transactionstorage.RenewedNotFound:
+  summary: "The transaction you're trying to renew doesn't exist in the block/index you referenced."
+  steps:
+    - "Double check the block number and extrinsic index of the original `store` call before calling `renew`."
+
+transactionstorage.EmptyTransaction:
+  summary: "You tried to store an empty (zero-byte) transaction, which isn't allowed."
+  steps:
+    - "Pass non-empty data to `transactionStorage.store`."
+
+transactionstorage.UnexpectedProof:
+  summary: "A storage proof was submitted in a block that doesn't require one."
+  steps:
+    - "Only submit `checkProof` in the block where the runtime actually expects a proof for that period."
+
+transactionstorage.InvalidProof:
+  summary: "The submitted storage proof doesn't actually verify against the stored data."
+  steps:
+    - "Regenerate the proof from the correct chunk/transaction data before resubmitting."
+
+transactionstorage.MissingProof:
+  summary: "A storage proof was required this block, but none was submitted."
+  steps:
+    - "Submit `checkProof` with a valid proof before the block that requires it closes."
+
+transactionstorage.MissingStateData:
+  summary: "The chain state needed to verify this proof is missing (e.g. pruned)."
+  steps:
+    - "Run against an archive node that retains the state needed to verify old storage proofs."
+
+transactionstorage.DoubleCheck:
+  summary: "A storage proof was already checked once in this block; a second one isn't allowed."
+  steps:
+    - "Only submit one `checkProof` per block."
+
+transactionstorage.ProofNotChecked:
+  summary: "This block ended without its required storage proof being checked."
+  steps:
+    - "Make sure `checkProof` is included as an inherent/extrinsic in every block where the runtime expects one."
+
+transactionstorage.TransactionTooLarge:
+  summary: "The data you're trying to store is bigger than the runtime's max transaction size."
+  steps:
+    - "Split the data into smaller chunks that fit under `MaxTransactionSize`."
+
+transactionstorage.TooManyTransactions:
+  summary: "This block already has the maximum number of stored transactions allowed."
+  steps:
+    - "Submit the `store` call in a later block."
+
+transactionstorage.BadContext:
+  summary: "`store` was called from a context outside normal block execution (e.g. via an off-chain state call)."
+  steps:
+    - "Call `transactionStorage.store` as a normal signed extrinsic inside a block, not via a runtime API call."
+
+# --- treasury -----------------------------------------------------------------
+treasury.InsufficientProposersBalance:
+  summary: "The proposer doesn't have enough free POT to cover the spend proposal's bond."
+  steps:
+    - "Fund the proposer account with enough POT to cover the required bond before calling `treasury.proposeSpend`."
+
+treasury.InvalidIndex:
+  summary: "No treasury proposal exists at the index you supplied."
+  steps:
+    - "Check `treasury.proposals` for valid proposal indices before calling."
+
+treasury.TooManyApprovals:
+  summary: "The treasury's approved-proposal queue is already at its maximum size."
+  steps:
+    - "Wait for the next spend period to clear the queue before approving more proposals."
+
+# --- vesting ------------------------------------------------------------------
+vesting.NotVesting:
+  summary: "This account has no active vesting schedule."
+  steps:
+    - "Only call vesting actions on an account that actually has a vesting schedule set up."
+
+vesting.ExistingVestingSchedule:
+  summary: "This account already has a vesting schedule, and adding another isn't allowed."
+  steps:
+    - "Wait for the current vesting schedule to fully vest, or use `vestedTransfer` to a different account."
+
+vesting.AmountLow:
+  summary: "The vesting transfer amount is below the minimum needed to create a schedule."
+  steps:
+    - "Increase the transferred amount to at least `MinVestedTransfer`."
