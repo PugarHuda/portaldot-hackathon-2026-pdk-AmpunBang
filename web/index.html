@@ -327,12 +327,13 @@
       Verified directly against a live node: <span class="mono">Assets.create</span>
       from Python's <span class="mono">substrate-interface</span> fails at the RPC
       layer with <span class="mono">"Invalid Transaction: bad signature"</span> before
-      it even reaches a dispatch error
-      (upstream <a href="https://github.com/polkascan/py-substrate-interface/issues/9">polkascan/py-substrate-interface#9</a>).
+      it even reaches a dispatch error — root-caused to Portaldot's V13 metadata
+      resolving the pallet's <span class="mono">min_balance</span> type as the
+      chain's global u128 balance width instead of the Assets pallet's actual
+      pallet-scoped u64.
       <span class="mono">@polkadot/api</span> signs the identical call
       successfully — <span class="mono">pdk-ts assets create/mint/transfer</span>
-      is the only member of the pair that can do this. ink! contract deploy is
-      next on the same path.
+      is the only member of the pair that can do this.
     </p>
     <p class="body" style="margin-top:12px;">
       Alpha.7 covers all 17 commands — the full chain / FailLens / signing

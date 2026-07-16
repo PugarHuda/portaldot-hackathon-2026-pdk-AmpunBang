@@ -568,13 +568,19 @@ MIT. All code is open source.
 ## Roadmap & known limitations
 
 Two deferred capabilities — **asset/token seeding** and **ink! contract
-deployment** — are blocked by the same upstream issue: `substrate-interface`
-(pdk's Python backend) mis-signs *custom-pallet* calls (Assets, Contracts) on
-Portaldot's **V13 metadata**, returning `Invalid Transaction: bad signature`.
-Balances calls sign correctly, so `pdk send` / `seed` / `simulate` build on them.
-(Confirmed across era and type-registry variations; see
-[substrate-interface #9](https://github.com/polkascan/py-substrate-interface/issues/9).)
+deployment** — hit separate blockers on the Python side:
 
-The clean unlock is a **typed TypeScript SDK on `@polkadot/api`**, which handles
-V13 custom-pallet signing correctly — the natural next step for pdk, alongside
-deeper CI and editor integrations.
+- **Assets pallet signing** (`Assets.create`/`mint`/`transfer`): Python's
+  `substrate-interface` mis-signs these on Portaldot's **V13 metadata**.
+  Root cause: the pallet declares `min_balance`'s type as `T::Balance`,
+  which `substrate-interface` resolves as the chain's *global* balance
+  type (u128) instead of the Assets pallet's own pallet-scoped `Balance`
+  type (u64) — the extra 8 bytes fail the node's signature check with
+  `Invalid Transaction: bad signature`. `pdk-ts` (the TypeScript CLI)
+  signs the same calls correctly today — see its README. Balances calls
+  sign correctly in Python either way, so `pdk send` / `seed` /
+  `simulate` build on them without issue.
+- **ink! contract deployment** — a separate, unrelated blocker: Portaldot's
+  `Contracts` pallet is an old, pre-2021 rent-model build, incompatible
+  with modern ink!/`cargo-contract` tooling. Not a signing bug; not
+  currently planned.
