@@ -1,0 +1,117 @@
+name: 'pdk report annotate'
+description: >-
+  Runs `pdk-ts report` (or Python `pdk report`) against a Portaldot/Substrate
+  node, decodes every failed extrinsic with FailLens, and publishes the
+  result as a job summary (and, optionally, a PR comment). Built for OTHER
+  repos' CI: point it at whatever node your integration tests ran against
+  (e.g. a Portaldot dev node started in a prior CI step) and it turns raw
+  dispatch errors into plain-language explanations on the run, instead of a
+  developer manually decoding them.
+author: 'Portaldot Dev Kit'
+branding:
+  icon: 'alert-triangle'
+  color: 'purple'
+
+inputs:
+  node:
+    description: 'WebSocket URL of the node to scan (e.g. ws://127.0.0.1:9944 or wss://your-ci-node).'
+    required: true
+  blocks:
+    description: 'How many recent blocks to scan for failed extrinsics.'
+    required: false
+    default: '20'
+  cli:
+    description: >-
+      Which CLI to run: 'pdk-ts' (Node/npm, installed fresh — recommended,
+      no --timeout limitation) or 'pdk' (Python/pip).
+    required: false
+    default: 'pdk-ts'
+  timeout:
+    description: 'Per-call timeout in seconds. Only applies to `cli: pdk-ts` — Python `pdk report` has no --timeout flag.'
+    required: false
+    default: '30'
+  pdk-ts-version:
+    description: "npm version or dist-tag to install when cli is 'pdk-ts' (portaldot-pdk-ts@<this>)."
+    required: false
+    default: 'alpha'
+  pdk-version:
+    description: "PyPI version pin to install when cli is 'pdk' (portaldot-pdk==<this>). Empty installs the latest release."
+    required: false
+    default: ''
+  python-version:
+    description: "Python version to set up when cli is 'pdk'."
+    required: false
+    default: '3.12'
+  max-explained-errors:
+    description: 'Cap on how many distinct error types get a FailLens `explain` lookup (each is an extra offline KB lookup, no extra node calls).'
+    required: false
+    default: '10'
+  fail-on-failures:
+    description: 'Fail this step (non-zero exit) when any failed extrinsic is found in range.'
+    required: false
+    default: 'false'
+  post-comment:
+    description: 'Also upsert a PR comment with the report (in addition to the job summary). Requires running on a pull_request event.'
+    required: false
+    default: 'false'
+  github-token:
+    description: 'Token used to post/update the PR comment. Only read when post-comment is true.'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  blocks-scanned:
+    description: 'Number of blocks actually scanned.'
+    value: ${{ steps.report.outputs.blocks-scanned }}
+  total-failures:
+    description: 'Total failed extrinsics found in range.'
+    value: ${{ steps.report.outputs.total-failures }}
+  has-failures:
+    description: "'true' if total-failures > 0."
+    value: ${{ steps.report.outputs.has-failures }}
+
+runs:
+  using: composite
+  steps:
+    # Node 22 is required by pdk-ts (engines.node >=22) and doubles as the
+    # runtime for this action's own aggregator script either way — one
+    # setup step covers both `cli` choices, no need to branch it.
+    - name: Setup Node
+      uses: actions/setup-node@v6
+      with:
+        node-version: '22'
+
+    - name: Install pdk-ts
+      if: inputs.cli == 'pdk-ts'
+      shell: bash
+      run: npm install -g "portaldot-pdk-ts@${{ inputs.pdk-ts-version }}"
+
+    - name: Setup Python
+      if: inputs.cli == 'pdk'
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install pdk
+      if: inputs.cli == 'pdk'
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.pdk-version }}" ]; then
+          pip install "portaldot-pdk==${{ inputs.pdk-version }}"
+        else
+          pip install portaldot-pdk
+        fi
+
+    - name: Run report + annotate
+      id: report
+      shell: bash
+      env:
+        PDK_NODE: ${{ inputs.node }}
+        PDK_BLOCKS: ${{ inputs.blocks }}
+        PDK_CLI: ${{ inputs.cli }}
+        PDK_TIMEOUT: ${{ inputs.timeout }}
+        PDK_MAX_EXPLAIN: ${{ inputs.max-explained-errors }}
+        FAIL_ON_FAILURES: ${{ inputs.fail-on-failures }}
+        POST_COMMENT: ${{ inputs.post-comment }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: node "${{ github.action_path }}/scripts/report-annotate.mjs"
