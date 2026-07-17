@@ -131,6 +131,10 @@ pdk-ts fund <to> [--amount N]  Top up an account with POT from //Alice (default 
 pdk-ts assets create <id>          Create an asset class — signs where Python can't
 pdk-ts assets mint <id> <to> --amount N      Mint asset units to an account
 pdk-ts assets transfer <id> <to> --amount N  Transfer asset units
+pdk-ts call <pallet>                    List a pallet's calls + arg types (metadata-driven)
+pdk-ts call <pallet> <call>             Show one call's expected argument types
+pdk-ts call <pallet> <call> [args...]   Sign & submit ANY pallet.call, not just the commands above
+pdk-ts call <pallet> <call> [args...] --dry-run  Validate + estimate fee, submit nothing
 pdk-ts seed [--file f]     Fund accounts from a YAML fixtures file
 pdk-ts diagnose            Tool + KB + index + connectivity status
 pdk-ts examples            Curated ready-to-copy invocations
