@@ -1,0 +1,46 @@
+name: report-annotate example
+
+# Demonstrates/dogfoods .github/actions/report-annotate — the reusable
+# composite action other teams building on Portaldot drop into their own
+# CI to get failed-transaction explanations annotated on a run, instead of
+# a developer manually decoding a raw dispatch error.
+#
+# This workflow consumes the action via a local path (`./.github/actions/
+# report-annotate`) because it lives in the same repo as the action. A
+# DOWNSTREAM repo would instead reference it as
+# `PugarHuda/portaldot-dev-kit/.github/actions/report-annotate@<ref>` — see
+# the README-style snippet in the action's own action.yml description, or
+# the project report for this change.
+#
+# Manual trigger only: this is a usage example, not a required check, and
+# there's no real Portaldot CI node to scan here — it points at a public
+# Substrate RPC as a stand-in target, the same fallback pdk-ts.yml's own
+# integration job uses since the Portaldot node binary has no CI-friendly
+# public endpoint of its own.
+on:
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # In a real consumer repo, this step runs AFTER whatever step starts
+      # your Portaldot dev node / integration test suite — point `node` at
+      # that node's WS endpoint instead.
+      - name: Run pdk-ts report + annotate
+        id: report
+        uses: ./.github/actions/report-annotate
+        with:
+          node: wss://rpc.polkadot.io
+          blocks: '20'
+          cli: pdk-ts
+          # fail-on-failures: 'true'  # uncomment to turn this into a CI gate
+          # post-comment: 'true'      # uncomment to also upsert a PR comment (needs a pull_request trigger)
+
+      - name: Use the outputs
+        run: |
+          echo "blocks scanned: ${{ steps.report.outputs.blocks-scanned }}"
+          echo "total failures: ${{ steps.report.outputs.total-failures }}"
+          echo "has failures:   ${{ steps.report.outputs.has-failures }}"
