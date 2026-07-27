@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PDK — Explorer Kickoff</title>
+<meta name="description" content="PDK Explorer Kickoff — from Hackathon Champion to community-built tool. First X Space." />
+<meta name="theme-color" content="#0a0c10" />
+<meta property="og:title" content="PDK — Explorer Kickoff" />
+<meta property="og:description" content="From Hackathon Champion to community-built tool. First X Space." />
+<meta property="og:url" content="https://portaldot-pdk.vercel.app/x-space" />
+<meta property="og:image" content="https://portaldot-pdk.vercel.app/logo.png" />
+<meta name="twitter:card" content="summary" />
+<link rel="icon" type="image/png" href="/logo.png" />
+<style>
+  :root {
+    --bg:#0a0c10; --panel:#14171d; --border:#21262d; --text:#c9d1d9;
+    --muted:#7d8590; --green:#3fb950; --red:#f85149; --amber:#d29922;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans);
+         overflow:hidden; -webkit-font-smoothing:antialiased; }
+  code,pre,.mono { font-family:var(--mono); }
+  a { color:var(--green); text-decoration:none; }
+
+  .progress { position:fixed; top:0; left:0; right:0; height:3px; background:#161a21; z-index:20; }
+  .bar { height:100%; width:10%; background:var(--green); transition:width .3s ease; }
+
+  #deck { position:relative; height:100vh; width:100vw; }
+  .slide {
+    position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center;
+    padding:7vh 9vw; opacity:0; transform:translateY(14px); pointer-events:none;
+    transition:opacity .35s ease, transform .35s ease; gap:18px;
+  }
+  .slide.active { opacity:1; transform:none; pointer-events:auto; }
+
+  .kicker { font-family:var(--mono); font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  h1 { font-size:clamp(40px,8vw,86px); line-height:1.02; letter-spacing:-.03em; color:#fff; }
+  h1 .dot { color:var(--green); }
+  h2 { font-size:clamp(26px,4.4vw,46px); line-height:1.1; letter-spacing:-.02em; color:#fff; }
+  .lede { font-size:clamp(17px,2.3vw,23px); color:var(--muted); max-width:60ch; }
+  ul { list-style:none; display:flex; flex-direction:column; gap:12px; font-size:clamp(15px,2vw,21px); }
+  ul li { padding-left:26px; position:relative; }
+  ul li::before { content:"▸"; color:var(--green); position:absolute; left:0; }
+  ol { list-style:none; display:flex; flex-direction:column; gap:16px; font-size:clamp(16px,2.1vw,22px); counter-reset:step; }
+  ol li { padding-left:44px; position:relative; }
+  ol li::before {
+    counter-increment:step; content:counter(step);
+    position:absolute; left:0; top:-2px; width:30px; height:30px; border-radius:50%;
+    border:1px solid var(--green); color:var(--green); font-family:var(--mono); font-weight:700;
+    font-size:14px; display:flex; align-items:center; justify-content:center;
+  }
+  .big-green { color:var(--green); }
+  .muted { color:var(--muted); } .red { color:var(--red); } .amber { color:var(--amber); }
+  strong { color:#fff; }
+
+  .term { background:var(--panel); border:1px solid var(--border); border-radius:10px; overflow:hidden; max-width:760px; }
+  .term-bar { display:flex; gap:7px; padding:10px 13px; border-bottom:1px solid var(--border); }
+  .term-bar i { width:11px; height:11px; border-radius:50%; display:block; }
+  .term-bar i:nth-child(1){background:#f85149} .term-bar i:nth-child(2){background:#d29922} .term-bar i:nth-child(3){background:#3fb950}
+  pre { padding:16px 18px; font-size:clamp(12px,1.5vw,15px); line-height:1.6; white-space:pre; overflow-x:auto; }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; max-width:900px; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; }
+  .card .cmd { font-family:var(--mono); color:var(--green); font-weight:700; font-size:22px; }
+  .card p { color:var(--muted); font-size:14px; margin-top:8px; }
+  .card.warn { border-color:var(--red); }
+  .card.warn .cmd { color:var(--red); }
+
+  .stat { font-family:var(--mono); font-weight:700; color:var(--green); font-size:clamp(90px,14vw,160px); line-height:1; }
+
+  .hud { position:fixed; bottom:18px; right:22px; font-family:var(--mono); font-size:12px; color:var(--muted); z-index:20; }
+  .hud .hint { opacity:.6; margin-left:10px; }
+  .foot { position:fixed; bottom:18px; left:22px; font-family:var(--mono); font-size:12px; color:var(--muted); z-index:20; }
+  @media (max-width:640px){ .hud .hint{ display:none; } }
+
+  body.clean .hud,
+  body.clean .foot,
+  body.clean .progress { display:none !important; }
+</style>
+</head>
+<body>
+<div class="progress"><div class="bar" id="bar"></div></div>
+
+<main id="deck">
+
+  <!-- 1 — Title -->
+  <section class="slide">
+    <div class="kicker" style="color:var(--green); font-weight:600; letter-spacing:.14em;">
+      🏆 Grand Champion · Hackathon Season 1 · Explorer Activation
+    </div>
+    <h1>PDK<span class="dot">.</span></h1>
+    <div class="lede">Explorer Kickoff — from Hackathon Champion to community-built tool.</div>
+    <div class="mono muted" style="margin-top:10px;">First X Space</div>
+  </section>
+
+  <!-- 2 — Agenda -->
+  <section class="slide">
+    <div class="kicker">Agenda</div>
+    <h2>What we're covering today.</h2>
+    <ul>
+      <li>Why PDK exists</li>
+      <li>The hackathon win</li>
+      <li>A real bug, decoded live</li>
+      <li>Where the knowledge base stands</li>
+      <li>How to become a Dev Explorer</li>
+      <li>Open Q&amp;A</li>
+    </ul>
+  </section>
+
+  <!-- 3 — The problem -->
+  <section class="slide">
+    <div class="kicker">The problem</div>
+    <h2>A transaction fails. The chain gives back a code you can't read.</h2>
+    <div class="term">
+      <div class="term-bar"><i></i><i></i><i></i></div>
+      <pre><span class="red">ExtrinsicFailed</span>: DispatchError <span class="muted">{ Module: { index: 6, error: 2 } }</span>
+<span class="muted"># no name. no reason. no way forward.</span></pre>
+    </div>
+    <div class="lede">You check the docs. Nothing. You search for it. Nothing. You're stuck before you've even really started.</div>
+  </section>
+
+  <!-- 4 — What it is -->
+  <section class="slide">
+    <div class="kicker">What it is</div>
+    <h2>Two CLIs. One shared knowledge base.</h2>
+    <div class="grid">
+      <div class="card"><div class="cmd">pdk</div><p>Python · PyPI · portaldot-pdk</p></div>
+      <div class="card"><div class="cmd">pdk-ts</div><p>TypeScript · npm · portaldot-pdk-ts</p></div>
+    </div>
+    <div class="mono muted" style="margin-top:6px;">raw error code&nbsp; → &nbsp;plain-language name&nbsp; → &nbsp;concrete fix steps</div>
+  </section>
+
+  <!-- 5 — Grand Champion -->
+  <section class="slide" style="align-items:center; text-align:center;">
+    <h1 class="big-green">🏆 Grand Champion</h1>
+    <div class="lede mono" style="margin:0 auto;">Hackathon Season 1</div>
+  </section>
+
+  <!-- 6 — War story -->
+  <section class="slide">
+    <div class="kicker">War story</div>
+    <h2>The Assets pallet signing bug.</h2>
+    <div class="grid">
+      <div class="card warn"><div class="cmd">pdk (Python)</div><p>"bad signature" at the RPC layer</p></div>
+      <div class="card"><div class="cmd">pdk-ts (TypeScript)</div><p>signs the identical call — success</p></div>
+    </div>
+    <div class="lede" style="margin-top:4px;">Root cause: Portaldot's metadata says one balance field is bigger
+      than it actually is. Python signs it at the wrong size — 8 extra bytes — so what it
+      signed no longer matches what the chain checks against.</div>
+  </section>
+
+  <!-- 7 — KB milestone -->
+  <section class="slide">
+    <div class="kicker">Milestone</div>
+    <div style="display:flex; align-items:baseline; gap:28px; flex-wrap:wrap;">
+      <div class="stat">1</div>
+      <div class="lede" style="max-width:36ch;">known Portaldot error still without a curated fix</div>
+    </div>
+    <div class="mono muted">Every fix is five lines of YAML — curated once, shared automatically across both CLIs.</div>
+  </section>
+
+  <!-- 8 — What's next -->
+  <section class="slide">
+    <div class="kicker">What's next</div>
+    <h2>Still actively shipping.</h2>
+    <div class="lede">Follow Discord for what's next — that's where it lands first.</div>
+  </section>
+
+  <!-- 9 — How to claim -->
+  <section class="slide">
+    <div class="kicker">How to claim</div>
+    <h2>Become a PDK Dev Explorer.</h2>
+    <ol>
+      <li>Follow <strong>@PortaldotDevKit</strong></li>
+      <li>Quote Retweet the anchor post + tag 3 friends</li>
+      <li>Join our Discord</li>
+      <li>Fill the form → get your Dev Explorer role</li>
+    </ol>
+  </section>
+
+  <!-- 10 — Q&A -->
+  <section class="slide" style="align-items:center; text-align:center;">
+    <h1>Open Q&amp;A</h1>
+    <div class="lede mono" style="margin:0 auto;">Thanks for being here for the first one.</div>
+  </section>
+
+</main>
+
+<div class="foot mono"><a href="/" style="color:inherit; text-decoration:none;">PDK — Portaldot Dev Kit</a> &nbsp;·&nbsp; <a href="/" style="color:var(--green);">← back to pdk</a></div>
+<div class="hud"><span id="counter">1 / 10</span><span class="hint">← →  /  space  ·  click sides</span></div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const bar = document.getElementById('bar');
+  const counter = document.getElementById('counter');
+  const _params = new URLSearchParams(location.search);
+  const _fromQuery = parseInt(_params.get('n'));
+  const _fromHash = parseInt(location.hash.slice(1));
+  let i = Math.min(slides.length - 1, Math.max(0, ((_fromQuery || _fromHash) || 1) - 1));
+
+  const cleanMode = new URLSearchParams(location.search).get('clean') === '1'
+                 || navigator.webdriver === true;
+  if (cleanMode) {
+    document.body.classList.add('clean');
+    document.querySelectorAll('.slide').forEach(s =>
+      s.style.transition = 'none');
+  }
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle('active', k === i));
+    counter.textContent = (i + 1) + ' / ' + slides.length;
+    bar.style.width = ((i + 1) / slides.length * 100) + '%';
+    history.replaceState(null, '', '#' + (i + 1));
+  }
+  const next = () => show(i + 1);
+  const prev = () => show(i - 1);
+
+  addEventListener('keydown', (e) => {
+    if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) { e.preventDefault(); next(); }
+    else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); prev(); }
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+  });
+  addEventListener('click', (e) => { if (e.target.closest('a')) return; (e.clientX > innerWidth / 2 ? next : prev)(); });
+
+  show(i);
+</script>
+</body>
+</html>
