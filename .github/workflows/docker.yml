@@ -71,7 +71,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build (load into local Docker for smoke test)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
@@ -114,7 +114,7 @@ jobs:
 
       - name: Push to GHCR (tag builds — multi-arch)
         if: startsWith(github.ref, 'refs/tags/pdk-ts-v')
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
