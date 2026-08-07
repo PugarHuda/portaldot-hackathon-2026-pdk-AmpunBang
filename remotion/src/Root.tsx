@@ -3,6 +3,11 @@ import {PdkVoting, FPS, DURATION_FRAMES, WIDTH, HEIGHT} from './Composition';
 import {LogoSquare, LogoHorizontal, LogoMono} from './brand/Logo';
 import {XBanner} from './brand/Banner';
 import {UpdateCard} from './brand/UpdateCard';
+import {CommunityCard} from './brand/CommunityCard';
+import {ExplorerActivation} from './brand/ExplorerActivation';
+import {ExplorerClaim} from './brand/ExplorerClaim';
+import {ThreadEnd} from './brand/ThreadEnd';
+import {SpaceAnnounce} from './brand/SpaceAnnounce';
 import {PdkLaunchAd, AD_FPS, AD_W, AD_H, AD_DURATION} from './ads/LaunchAd';
 
 export const Root: React.FC = () => {
@@ -45,6 +50,37 @@ export const Root: React.FC = () => {
         component={UpdateCard}
         width={1600}
         height={900}
+      />
+      <Still
+        id="CommunityCard"
+        component={CommunityCard}
+        width={1600}
+        height={900}
+      />
+      <Still
+        id="ExplorerActivation"
+        component={ExplorerActivation}
+        width={1600}
+        height={900}
+      />
+      <Still
+        id="ExplorerClaim"
+        component={ExplorerClaim}
+        width={1600}
+        height={900}
+      />
+      <Still
+        id="ThreadEnd"
+        component={ThreadEnd}
+        width={1600}
+        height={900}
+      />
+      <Still
+        id="SpaceAnnounce"
+        component={SpaceAnnounce}
+        width={1600}
+        height={900}
+        defaultProps={{date: 'Wed, Jul 29', time: '12:00 UTC'}}
       />
       <Composition
         id="PdkLaunchAd"
