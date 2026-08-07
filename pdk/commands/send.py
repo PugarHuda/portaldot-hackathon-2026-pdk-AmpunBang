@@ -9,6 +9,7 @@ from substrateinterface import Keypair
 from pdk.config import DEFAULT_NODE_URL
 from pdk.core.chain import POT_DECIMALS, connect, free_balance, normalise_account_uri, pot_to_plancks, submit_call
 from pdk.core.decoder import decode_receipt
+from pdk.core.events import receipt_succeeded
 from pdk.commands.simulate import predict_outcome
 
 console = Console()
@@ -52,11 +53,11 @@ def run(
         console.print(f"[red]Send failed: {exc}[/red]")
         raise typer.Exit(code=1)
 
-    if receipt.is_success:
+    if receipt_succeeded(substrate, receipt):
         console.print(f"[green]✓ sent {amount:,} POT[/green]  {sender} → {to}")
         console.print(f"[dim]tx: {receipt.extrinsic_hash}[/dim]")
     else:
-        decoded = decode_receipt(receipt)
+        decoded = decode_receipt(receipt, substrate)
         console.print(f"[red]✗ transfer failed: {decoded.name if decoded else 'unknown'}[/red]")
         console.print(f"[dim]Diagnose it: pdk debug {receipt.extrinsic_hash}[/dim]")
         raise typer.Exit(code=1)
