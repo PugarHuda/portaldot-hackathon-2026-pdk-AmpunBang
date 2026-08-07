@@ -1,6 +1,6 @@
 [project]
 name = "portaldot-pdk"
-version = "0.1.8"
+version = "0.2.0"
 description = "Portaldot Dev Kit — Python CLI that decodes failed Portaldot transactions into named errors and fix steps. See also `pdk-ts` for the TypeScript companion covering signing surfaces Python cannot reach on V13 metadata."
 readme = "README.md"
 requires-python = ">=3.11"

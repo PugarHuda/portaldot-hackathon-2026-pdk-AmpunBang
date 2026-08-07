@@ -22,11 +22,11 @@ Built during the **Portaldot Online Mini Hackathon S1** — *Builder Tools* trac
 
 **[▶ Live page](https://portaldot-pdk.vercel.app)** · [**Live demo (in-browser)**](https://portaldot-pdk.vercel.app/demo) · [Dashboard](https://portaldot-pdk.vercel.app/dashboard) · [Error reference](https://portaldot-pdk.vercel.app/errors) · [Pitch deck](https://portaldot-pdk.vercel.app/slide) · [Discord](https://discord.gg/WFZyHucQu) · [Changelog](CHANGELOG.md)
 
-> **v0.1.8 ([on PyPI](https://pypi.org/project/portaldot-pdk/)).**
-> **16 commands** for the whole local dev loop · **AI auto-on** when `PDK_AI_KEY`
+> **v0.2.0 ([on PyPI](https://pypi.org/project/portaldot-pdk/)).**
+> **18 commands** for the whole local dev loop · **AI auto-on** when `PDK_AI_KEY`
 > is set (no `--ai` flag; the verified KB stays the source of truth) ·
 > **`/demo` web page** replays the actual asciinema cast in your browser ·
-> **122 pytest cases (Python) + 125 vitest cases (pdk-ts)** verified against a
+> **184 pytest cases (Python) + 141 vitest cases (pdk-ts)** verified against a
 > real `portaldot-1002` node, plus a hardening pass (Rich-markup /
 > terminal-escape injection, prompt-injection defense, exact planck math,
 > `--json` CI contract).
@@ -36,11 +36,10 @@ Built during the **Portaldot Online Mini Hackathon S1** — *Builder Tools* trac
 > (`doctor`, `accounts`, `pallets`, `storage`, `keys`, `explain`, `debug`,
 > `report`, `simulate`, `send`, `fund`, `seed`, `watch`, `diagnose`, `examples`,
 > `kb`, `version`), including the signing tier and the hero `debug` (FailLens)
-> — all verified live against a `--dev` node. **Plus `assets`
-> (create/mint/transfer): Portaldot Assets-pallet calls Python
-> `substrate-interface` cannot sign at all** (verified — it fails at the RPC
-> layer with "bad signature" before reaching a dispatch error). (Node
-> lifecycle `up` and `ai-setup` stay Python-only.) Also importable as a library —
+> — all verified live against a `--dev` node. Plus `assets`
+> (create/mint/transfer) and the metadata-driven `call` composer, both now
+> matched by Python in 0.2.0. (Node lifecycle `up` and `ai-setup` stay
+> Python-only.) Also importable as a library —
 > `import { resolveByName } from 'portaldot-pdk-ts'` cold-imports in ~430 ms;
 > offline FailLens lookup in ~40 ms. Read the
 > [pdk-ts roadmap](pdk-ts/README.md#roadmap) for the 0.2.0 npm ship plan.
@@ -86,11 +85,11 @@ intended environment), and the developer experience is rough:
   channel is full of *"how do I get POT?"* and *"where's the RPC / faucet?"*).
 
 **Solution.** `pdk` (Portaldot Dev Kit) is a Python CLI with
-**16 commands** that owns the local development loop end-to-end, plus a
+**18 commands** that owns the local development loop end-to-end, plus a
 TypeScript companion (`pdk-ts`, [pdk-ts/](pdk-ts/), at alpha.7 — 17
-commands covering Python's full chain/FailLens/signing surface, plus a
-library entry point) that covers what Python can't sign on Portaldot V13
-metadata. Both CLIs share
+commands covering the same chain/FailLens/signing surface, plus a
+library entry point) for projects that would rather not add a Python
+runtime. Both CLIs share
 one knowledge base — run `pdk kb --missing` or `pdk-ts kb --missing` to
 see what needs curating:
 
@@ -452,7 +451,7 @@ How to fix
 ```
 ┌──────────────┐   typer CLI   ┌──────────────┐   substrate-interface   ┌────────────────┐
 │  pdk <cmd>   │ ───────────▶  │  pdk/core/   │ ─────────────────────▶ │  Portaldot     │
-│ (16 commands)│               │  chain.py    │   websocket RPC        │  node (1002)   │
+│ (18 commands)│               │  chain.py    │   websocket RPC        │  node (1002)   │
 └──────────────┘               │  decoder.py  │ ◀───────────────────── └────────────────┘
                                │  knowledge.py│      ExtrinsicFailed event
                                │  report.py   │      DispatchError { Module: idx,err }
@@ -507,8 +506,8 @@ designed to work on the real chain without that caveat.
 
 ```
 pdk/
-  cli.py            typer app; registers the 16 commands (up, accounts, debug,
-                    explain, doctor, simulate, seed, pallets, send, fund, storage, watch, keys, report, ai-setup, kb)
+  cli.py            typer app; registers the 18 commands (up, accounts, debug,
+                    explain, doctor, simulate, seed, pallets, send, fund, storage, watch, keys, report, ai-setup, kb, assets, call)
   config.py         static defaults (node URL, scan depth, binary name)
   commands/         one thin module per command (parse args → call core → render)
   core/

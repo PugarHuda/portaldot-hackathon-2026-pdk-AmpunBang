@@ -1,11 +1,15 @@
 /**
- * `pdk-ts assets` — sign Assets pallet operations. This is pdk-ts's actual
- * reason to exist, not just a claim: Python `substrate-interface` cannot
- * sign Assets calls on Portaldot's V13 metadata at all — verified directly
- * against a live node, `Assets.create` from Python fails at the RPC layer
- * with "Invalid Transaction: bad signature" before it even reaches a
- * dispatch error. @polkadot/api signs the same call successfully. `pdk-ts`
- * is the only member of the pair that can do this.
+ * `pdk-ts assets` — sign Assets pallet operations.
+ *
+ * History, because this file used to claim otherwise: @polkadot/api signed
+ * these calls correctly from day one, while Python `substrate-interface`
+ * could not sign them at all on Portaldot's V13 metadata — `Assets.create`
+ * was rejected at the RPC layer with "Invalid Transaction: bad signature"
+ * before reaching dispatch. That gap is closed as of pdk 0.2.0: the Python
+ * side root-caused it (a bare `Balance` resolving to u128 where
+ * pallet-assets uses u64) and patched both the call encoding and the event
+ * decode, so `pdk assets` now exists too. The pair is at parity here;
+ * pick whichever runtime your project already has.
  *
  * Three lifecycle operations — the minimum to create, fund, and move a
  * custom asset: `create`, `mint`, `transfer`. All three submit through

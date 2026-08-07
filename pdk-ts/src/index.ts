@@ -167,7 +167,7 @@ program
 
 const assetsCmd = program
   .command('assets')
-  .description('Sign Assets pallet operations — the surface Python substrate-interface cannot sign on Portaldot V13 metadata');
+  .description('Sign Assets pallet operations (create/mint/transfer) — at parity with `pdk assets` since pdk 0.2.0');
 
 assetsCmd
   .command('create <id>')

@@ -4,19 +4,23 @@
 [![CI](https://github.com/PugarHuda/portaldot-dev-kit/actions/workflows/pdk-ts.yml/badge.svg)](https://github.com/PugarHuda/portaldot-dev-kit/actions/workflows/pdk-ts.yml)
 [![Docker](https://github.com/PugarHuda/portaldot-dev-kit/actions/workflows/docker.yml/badge.svg)](https://github.com/PugarHuda/portaldot-dev-kit/actions/workflows/docker.yml)
 
-Status: **v0.2.0-alpha.7** — 17 commands, covering every chain / FailLens / signing command Python pdk has (`doctor`, `accounts`, `pallets`, `storage`, `keys`, `explain`, `debug`, `report`, `simulate`, `send`, `fund`, `seed`, `watch`, `diagnose`, `examples`, `kb`, `version`), **plus `assets` (create/mint/transfer) — Assets pallet signing Python cannot do at all**, the actual reason this companion exists. (Python-only `up` (node lifecycle) and `ai-setup` are out of scope for the companion.)
+Status: **v0.2.0-alpha.7** — 17 commands, covering every chain / FailLens / signing command Python pdk has (`doctor`, `accounts`, `pallets`, `storage`, `keys`, `explain`, `debug`, `report`, `simulate`, `send`, `fund`, `seed`, `watch`, `diagnose`, `examples`, `kb`, `version`), plus `assets` (create/mint/transfer) and the metadata-driven `call` composer. (Python-only `up` (node lifecycle) and `ai-setup` are out of scope for the companion.)
 
 pdk-ts is the TypeScript companion CLI to the Python
-[`portaldot-pdk`](https://pypi.org/project/portaldot-pdk/). Its reason to
-exist, proven not just claimed: Python `substrate-interface` cannot sign
-Assets pallet calls on Portaldot's V13 metadata at all — verified directly
-against a live node, `Assets.create` from Python fails at the RPC layer
-with `Invalid Transaction: bad signature` before it even reaches a dispatch
-error. `@polkadot/api` signs the same call successfully. `pdk-ts assets` —
-`create` · `mint` · `transfer` — is the only member of the pair that can do
-this.
+[`portaldot-pdk`](https://pypi.org/project/portaldot-pdk/). Same commands,
+same terminal UX, Node-backed — so a JS/TS project can use the toolkit
+without a Python runtime, and import it as a library
+(`import { resolveByName, collectReport } from 'portaldot-pdk-ts'`).
 
-17 commands covering Python pdk's full chain/FailLens/signing surface, plus Assets pallet signing Python can't do — Node-backed, same terminal UX.
+pdk-ts led on Assets pallet signing: `@polkadot/api` signed those calls
+correctly while Python `substrate-interface` could not sign them at all on
+Portaldot's V13 metadata, failing at the RPC layer with `Invalid
+Transaction: bad signature` before dispatch. That is no longer a
+difference — pdk 0.2.0 root-caused the underlying `Balance` width
+ambiguity and shipped `pdk assets`, so the two are at parity. Pick the one
+matching the runtime your project already has.
+
+17 commands covering Python pdk's full chain/FailLens/signing surface — Node-backed, same terminal UX, importable as a library.
 
 ## In a hurry
 
@@ -66,12 +70,12 @@ either side. The shared YAML KB adds human-authored fix steps on top.
 
 Version numbers here are **per-package**, not a global release. Python
 pdk shipped stable at 0.1.6 during the hackathon. pdk-ts starts fresh
-at 0.2 to signal that this whole track is the *v0.2 initiative* —
-covering the parts of the runtime Python can't sign — and the first
-`.0` release lands only when it reaches feature parity. Alpha.1–4 built
-the read-only surface; alpha.5 lit up signing and the full command
+at 0.2 to signal that this whole track is the *v0.2 initiative*, and the
+first `.0` release lands only when it reaches feature parity. Alpha.1–4
+built the read-only surface; alpha.5 lit up signing and the full command
 surface; alpha.6 was a post-publish QA + packaging-fix pass; alpha.7
-shipped Assets pallet signing — the surface Python can't touch at all.
+shipped Assets pallet signing — which Python could not do at the time,
+and matched in pdk 0.2.0.
 
 ## Support
 
@@ -128,7 +132,7 @@ pdk-ts simulate --amount N Preview a transfer's fee + feasibility (no send)
 pdk-ts send <to> --amount N  Submit a REAL POT transfer (transferKeepAlive)
 pdk-ts send <to> --amount N --dry-run  Preview the fee + feasibility, submit nothing
 pdk-ts fund <to> [--amount N]  Top up an account with POT from //Alice (default 100)
-pdk-ts assets create <id>          Create an asset class — signs where Python can't
+pdk-ts assets create <id>          Create an asset class (admin defaults to the signer)
 pdk-ts assets mint <id> <to> --amount N      Mint asset units to an account
 pdk-ts assets transfer <id> <to> --amount N  Transfer asset units
 pdk-ts call <pallet>                    List a pallet's calls + arg types (metadata-driven)

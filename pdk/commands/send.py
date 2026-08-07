@@ -7,7 +7,9 @@ from rich.console import Console
 from substrateinterface import Keypair
 
 from pdk.config import DEFAULT_NODE_URL
-from pdk.core.chain import POT_DECIMALS, connect, free_balance, normalise_account_uri, pot_to_plancks, submit_call
+from pdk.core.chain import (
+    POT_DECIMALS, connect, free_balance, normalise_account_uri, pot_to_plancks, resolve_account, submit_call,
+)
 from pdk.core.decoder import decode_receipt
 from pdk.core.events import receipt_succeeded
 from pdk.commands.simulate import predict_outcome
@@ -36,11 +38,7 @@ def run(
         raise typer.Exit(code=1)
 
     keypair = Keypair.create_from_uri(normalise_account_uri(sender))
-    # Normalise the recipient too: a git-bash-mangled `//Bob` → `/Bob`
-    # would otherwise derive a DIFFERENT address and send real POT to
-    # the wrong account with no warning.
-    to_norm = normalise_account_uri(to)
-    dest = Keypair.create_from_uri(to_norm).ss58_address if (to_norm.startswith("//") or "/" in to_norm) else to_norm
+    dest = resolve_account(to)
 
     if dry_run:
         _dry_run(substrate, keypair, dest, sender, to, amount, json_out)
