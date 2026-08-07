@@ -14,7 +14,7 @@ against a live node, `Assets.create` from Python fails at the RPC layer
 with `Invalid Transaction: bad signature` before it even reaches a dispatch
 error. `@polkadot/api` signs the same call successfully. `pdk-ts assets` —
 `create` · `mint` · `transfer` — is the only member of the pair that can do
-this. ink! contract deploy is the next candidate for the same treatment.
+this.
 
 17 commands covering Python pdk's full chain/FailLens/signing surface, plus Assets pallet signing Python can't do — Node-backed, same terminal UX.
 
@@ -49,7 +49,7 @@ Cold import ~430 ms · offline lookup ~40 ms · no `@polkadot/api` until you act
         │  v0.1.7 · PyPI│          │ v0.2 alpha.7·npm α│
         │               │          │                 │
         │ substrate-    │          │ @polkadot/api   │
-        │ interface     │          │ (PAPI at α.8)   │
+        │ interface     │          │ (PAPI deferred) │
         └───────┬───────┘          └────────┬────────┘
                 │                           │
                 └───────────┬───────────────┘
@@ -92,7 +92,7 @@ shipped Assets pallet signing — the surface Python can't touch at all.
 | alpha.5 | Signing tier (`simulate` · `send` · `seed`) + `report` · `watch` + hero `debug` (FailLens) — full command surface, verified live | ✅ |
 | alpha.6 | Post-publish QA: ship the KB in the tarball, submission-timeout on `send`/`seed`, `--json` parity with Python, deterministic `watch` exit, doc fixes | ✅ |
 | **alpha.7** (current) | `assets` (create/mint/transfer) signing — the surface Python can't sign at all; `send --dry-run`; `fund`; `report --exit-code`; +9 curated KB entries | ✅ |
-| alpha.8 | PAPI migration spike + benchmark vs `@polkadot/api`; bundle-size pass | ◻️ |
+| alpha.8 | PAPI migration spike: hard blocker found — PAPI only supports metadata V14/V15, Portaldot serves V13, can't connect at all. Deferred until either side moves. Bundle-size pass still open | ✅ (deferred) |
 | beta.1  | Hardening + docs pass on the full surface | ◻️ |
 | 0.2.0   | Ship as `portaldot-pdk-ts` on npm (`latest` dist-tag) | ◻️ |
 
@@ -131,6 +131,10 @@ pdk-ts fund <to> [--amount N]  Top up an account with POT from //Alice (default 
 pdk-ts assets create <id>          Create an asset class — signs where Python can't
 pdk-ts assets mint <id> <to> --amount N      Mint asset units to an account
 pdk-ts assets transfer <id> <to> --amount N  Transfer asset units
+pdk-ts call <pallet>                    List a pallet's calls + arg types (metadata-driven)
+pdk-ts call <pallet> <call>             Show one call's expected argument types
+pdk-ts call <pallet> <call> [args...]   Sign & submit ANY pallet.call, not just the commands above
+pdk-ts call <pallet> <call> [args...] --dry-run  Validate + estimate fee, submit nothing
 pdk-ts seed [--file f]     Fund accounts from a YAML fixtures file
 pdk-ts diagnose            Tool + KB + index + connectivity status
 pdk-ts examples            Curated ready-to-copy invocations
@@ -224,7 +228,8 @@ resolution. Only the offline fast path is Portaldot-specific.
 **Q: When will pdk-ts publish to npm?**
 A: Prereleases already ship to the `alpha` dist-tag (`npm install
 portaldot-pdk-ts@alpha`). The `0.2.0` stable `latest` release lands after
-the alpha.8 PAPI/bundle pass and a beta.1 hardening pass.
+a beta.1 hardening pass — alpha.8's PAPI migration is deferred (see
+Bundle size below), so it's no longer a blocker.
 
 **Q: How is pdk-ts different from `@polkadot/api` or PAPI?**
 A: pdk-ts is a **CLI** built on top of those libraries. See the
@@ -232,8 +237,12 @@ comparison table at the root README. Short version: PAPI/api are
 libraries, pdk-ts is the 17-command dev-loop toolkit.
 
 **Q: What about ink! contracts?**
-A: pdk-ts uses native pallets (Balances, Assets). ink! contract deploy is
-the next signing target on the same path as Assets — not yet shipped.
+A: Scoped and dropped. Portaldot's `Contracts` pallet does exist, but
+it's an old, pre-2021 rent-model build (`u64` gas, no
+`storageDepositLimit`, rent/tombstone errors still present) —
+incompatible with modern ink!/`cargo-contract` tooling. This confirms
+why pdk-ts uses native pallets (Balances, Assets) instead of deployed
+contracts. Not planned.
 
 ## Bundle size
 
@@ -241,9 +250,18 @@ Installed `pdk-ts` (node_modules included) is roughly **190 MB** —
 mostly `@polkadot/api` and its transitive dependencies for chain
 encoding, metadata handling, and crypto. The compiled distributable
 (`dist/`) is under **200 KB**; the size lives in the runtime
-dependencies, not our code. Bundle-size optimisation is scoped for
-α.8 alongside the PAPI migration spike, since PAPI's smaller
-footprint is one of its main selling points.
+dependencies, not our code.
+
+The α.8 spike measured PAPI (`polkadot-api@2.1.8`) as a replacement:
+its own runtime graph is lighter (~20-23 MB excluding the codegen CLI
+it hard-depends on, which pulls in TypeScript/esbuild/rollup and
+brings installed size back up to ~88 MB — not the clean win the
+headline package size suggests). Moot either way: PAPI's metadata
+layer only decodes **V14/V15** metadata, Portaldot's runtime serves
+**V13**, and PAPI has no legacy `state_getMetadata` fallback — verified
+live, it can't connect to a Portaldot node at all. No bundle-size
+optimisation is planned until that's resolved on one side or the
+other.
 
 ## Design bets
 

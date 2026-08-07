@@ -6,6 +6,7 @@ import re
 import time
 from decimal import Decimal, InvalidOperation
 
+from scalecodec.base import ScaleBytes
 from substrateinterface import ExtrinsicReceipt, Keypair, SubstrateInterface
 from substrateinterface.exceptions import SubstrateRequestException
 
@@ -97,6 +98,58 @@ def _is_pool_collision(exc: SubstrateRequestException) -> bool:
     return "priority is too low" in text or "already in the pool" in text
 
 
+# Only `Assets.create`'s `min_balance` is affected. Its metadata declares
+# the arg as the bare (non-Compact) `Balance` type, so the wrong width
+# lands directly in the encoding. `mint`/`transfer`'s `amount` is declared
+# `Compact<Balance>` — compact encoding is width-agnostic for any value
+# that fits in a u64 (i.e. every realistic asset amount), so the same
+# u128-vs-u64 ambiguity produces byte-identical output either way and
+# doesn't need patching. Verified live: mint/transfer sign and dispatch
+# correctly with no patch at all; create fails without it (RPC 1010).
+_ASSETS_BALANCE_ARG = {"create": "min_balance"}
+
+
+def _fix_assets_balance_width(substrate, call, balance_value: int):
+    """Correct substrate-interface's mis-encoding of `Assets.create`'s
+    trailing `min_balance` argument.
+
+    Root cause (byte-verified against @polkadot/api on a live node): the
+    Assets pallet's V13 metadata declares this arg's type as the literal
+    string `T::Balance`. substrate-interface strips the `T::` prefix and
+    resolves the bare name `Balance` — which its type registry defines
+    globally as u128 (the chain's *native* POT balance width). It has no
+    pallet-scoped override, so it can't tell that within the Assets
+    pallet's own Config, `Balance` is actually u64 — confirmed by decoding
+    the same call with @polkadot/api (which resolves it correctly) and by
+    scalecodec's own `legacy.json` preset. The result: compose_call() emits
+    8 extra bytes nobody asked for. Since `min_balance` is the last-encoded
+    field in the call, and the call is the last field in the extrinsic,
+    those extra bytes are included in the payload Python signs — but the
+    node decodes the call with the CORRECT (narrower) type and re-derives a
+    shorter payload to verify the signature against. The byte mismatch is
+    what surfaces as "Invalid Transaction: bad signature" (RPC 1010),
+    before the call ever reaches dispatch.
+
+    Global registry overrides aren't safe here (`Balance` genuinely means
+    u128 elsewhere, e.g. Balances.transfer) and scalecodec's type registry
+    has no per-pallet override mechanism — so this patches just the known-
+    wrong trailing bytes of this one call's encoding, verified against a
+    live node (see pdk's assets-signing investigation notes).
+    """
+    wrong = bytes(substrate.runtime_config.create_scale_object("u128").encode(balance_value).data)
+    correct = bytes(substrate.runtime_config.create_scale_object("u64").encode(balance_value).data)
+    raw = bytes(call.data.data)
+    if not raw.endswith(wrong):
+        # Metadata/runtime changed shape since this was verified — bail
+        # rather than silently sign something we no longer understand.
+        raise RuntimeError(
+            "Assets call encoding no longer matches the known bad-width pattern; "
+            "re-verify pdk's Assets signing fix against the current metadata."
+        )
+    call.data = ScaleBytes(raw[: -len(wrong)] + correct)
+    return call
+
+
 def submit_call(substrate, keypair, call_module, call_function, call_params, retries: int = 3):
     """Compose, sign, and submit a call; wait for inclusion; return the receipt.
 
@@ -106,6 +159,9 @@ def submit_call(substrate, keypair, call_module, call_function, call_params, ret
     call = substrate.compose_call(
         call_module=call_module, call_function=call_function, call_params=call_params
     )
+    if call_module == "Assets" and call_function in _ASSETS_BALANCE_ARG:
+        balance_value = call_params[_ASSETS_BALANCE_ARG[call_function]]
+        call = _fix_assets_balance_width(substrate, call, balance_value)
     last_exc: SubstrateRequestException | None = None
     for attempt in range(retries):
         extrinsic = substrate.create_signed_extrinsic(call=call, keypair=keypair, tip=attempt * 1_000_000)

@@ -12,7 +12,9 @@ const BG = '#0a0c10';
 const INK = '#ededed';
 const ACCENT = '#3fb950';
 
-type Size = {font: number; dot: number; gap: number; yOffset: number};
+// `gap`/`dotOffsetY` are optional: every brand still already omits one or the
+// other, and both default to 0 (which is what they silently rendered as before).
+type Size = {font: number; dot: number; gap?: number; dotOffsetY?: number};
 
 function Wordmark({size, dotColor}: {size: Size; dotColor: string}) {
   return (
@@ -36,16 +38,16 @@ function Wordmark({size, dotColor}: {size: Size; dotColor: string}) {
           height: size.dot,
           borderRadius: '50%',
           background: dotColor,
-          marginLeft: size.gap,
-          transform: `translateY(${size.yOffset}px)`,
+          marginLeft: size.gap ?? 0,
+          transform: `translateY(${size.dotOffsetY ?? 0}px)`,
         }}
       />
     </div>
   );
 }
 
-const bigSize: Size = {font: 340, dot: 78, gap: 22, yOffset: -4};
-const midSize: Size = {font: 200, dot: 46, gap: 12, yOffset: -2};
+const bigSize: Size = {font: 340, dot: 78, gap: 22, dotOffsetY: -4};
+const midSize: Size = {font: 200, dot: 46, gap: 12, dotOffsetY: -2};
 
 export const LogoSquare: React.FC = () => {
   return (

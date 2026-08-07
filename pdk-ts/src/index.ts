@@ -37,6 +37,7 @@ import * as simulate from './commands/simulate.js';
 import * as send from './commands/send.js';
 import * as fund from './commands/fund.js';
 import * as assets from './commands/assets.js';
+import * as call from './commands/call.js';
 import * as seed from './commands/seed.js';
 import * as watch from './commands/watch.js';
 import * as debug from './commands/debug.js';
@@ -64,6 +65,9 @@ Examples:
   $ pdk-ts explain --module 6 --error 2       (offline fast path)
   $ pdk-ts explain --name balances.InsufficientBalance
   $ pdk-ts explain --module 6 --error 2 --live  (force metadata walk)
+  $ pdk-ts call Balances                        (list a pallet's calls)
+  $ pdk-ts call Balances transferKeepAlive      (show one call's args)
+  $ pdk-ts call Balances transferKeepAlive //Bob 1000000000000
 
 Environment:
   PDK_TS_NODE            override the default ws://127.0.0.1:9944
@@ -195,6 +199,16 @@ assetsCmd
   .option('--timeout <seconds>', 'connect timeout in seconds')
   .option('--json', 'emit machine-readable JSON')
   .action((id, to, opts) => assets.runTransfer(id, to, opts));
+
+program
+  .command('call <pallet> [call] [args...]')
+  .description('Generic extrinsic composer — sign & submit ANY pallet.call from live metadata, not just the hardcoded commands')
+  .option('--from <uri>', 'signing account URI (default //Alice)')
+  .option('--dry-run', 'validate the call + estimate the fee, submit nothing')
+  .option('--node <url>', 'WebSocket endpoint (overrides PDK_TS_NODE)')
+  .option('--timeout <seconds>', 'connect timeout in seconds')
+  .option('--json', 'emit machine-readable JSON')
+  .action((pallet, callName, args, opts) => call.run(pallet, callName, args ?? [], opts));
 
 program
   .command('seed')
