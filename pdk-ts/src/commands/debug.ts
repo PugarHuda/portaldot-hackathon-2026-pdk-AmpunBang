@@ -140,7 +140,9 @@ function emitDiagnosis(txHash: string, label: string, json: boolean): boolean {
   if (report?.steps.length) {
     console.log(border('  │'));
     console.log(`  ${border('│')}  ${pc.bold('How to fix')}`);
-    report.steps.forEach((step, i) => console.log(`  ${border('│')}  ${i + 1}. ${step}`));
+    report.steps.forEach((step, i) => {
+      console.log(`  ${border('│')}  ${i + 1}. ${step}`);
+    });
   }
   console.log(border('  └─'));
   console.log();

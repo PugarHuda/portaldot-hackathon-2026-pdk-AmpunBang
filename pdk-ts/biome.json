@@ -1,37 +1,42 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "files": {
-    "include": ["src/**/*.ts", "tests/**/*.ts"],
-    "ignore": ["dist", "node_modules", "**/*.d.ts"]
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "correctness": {
-        "noUnusedVariables": "error",
-        "noUnusedImports": "error"
-      },
-      "style": {
-        "useConst": "error",
-        "noNonNullAssertion": "warn"
-      },
-      "suspicious": {
-        "noExplicitAny": "error"
-      },
-      "performance": {
-        "noDelete": "off"
-      }
-    }
-  },
-  "formatter": {
-    "enabled": false
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "trailingCommas": "all",
-      "semicolons": "always"
-    }
-  }
+	"$schema": "https://biomejs.dev/schemas/2.5.6/schema.json",
+	"files": {
+		"includes": [
+			"**/src/**/*.ts",
+			"**/tests/**/*.ts",
+			"!**/dist",
+			"!**/node_modules",
+			"!**/*.d.ts"
+		]
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+			"correctness": {
+				"noUnusedVariables": "error",
+				"noUnusedImports": "error"
+			},
+			"style": {
+				"useConst": "error",
+				"noNonNullAssertion": "warn"
+			},
+			"suspicious": {
+				"noExplicitAny": "error"
+			},
+			"performance": {
+				"noDelete": "off"
+			}
+		}
+	},
+	"formatter": {
+		"enabled": false
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "single",
+			"trailingCommas": "all",
+			"semicolons": "always"
+		}
+	}
 }
