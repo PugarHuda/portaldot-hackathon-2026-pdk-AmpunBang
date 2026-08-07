@@ -36,7 +36,7 @@ def scan_failures(substrate, blocks: int = RECENT_BLOCKS_SCAN) -> list[FailureHi
             break
         number = int(block["header"]["number"])
         for receipt in failed_receipts_in_block(substrate, block_hash):
-            decoded = decode_receipt(receipt)
+            decoded = decode_receipt(receipt, substrate)
             if decoded is not None:
                 hits.append(FailureHit(block=number, decoded=decoded))
         parent = block["header"]["parentHash"]

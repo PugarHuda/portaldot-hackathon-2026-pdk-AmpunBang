@@ -16,6 +16,7 @@ from substrateinterface import Keypair
 
 from pdk.config import DEFAULT_NODE_URL
 from pdk.core.chain import connect, pot_to_plancks, submit_call
+from pdk.core.events import receipt_succeeded
 
 console = Console()
 _DEFAULT = Path(__file__).resolve().parent.parent / "data" / "seed.example.yaml"
@@ -55,9 +56,10 @@ def run(
                 substrate, alice, "Balances", "transfer",
                 {"dest": dest, "value": pot_to_plancks(fx["pot"])},
             )
-            mark = "[green]✓[/green]" if receipt.is_success else "[red]✗[/red]"
+            succeeded = receipt_succeeded(substrate, receipt)
+            mark = "[green]✓[/green]" if succeeded else "[red]✗[/red]"
             console.print(f"  {mark} funded {fx['to']} with {fx['pot']:,} POT")
-            applied += 1 if receipt.is_success else 0
+            applied += 1 if succeeded else 0
         except Exception as exc:  # noqa: BLE001
             console.print(f"  [red]✗ fund {fx.get('to')} failed: {str(exc)[:90]}[/red]")
     console.print(f"[green]seed complete[/green] — {applied}/{len(fixtures)} accounts funded.")

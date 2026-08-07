@@ -19,6 +19,7 @@ from pdk.core.decoder import (
     find_receipt,
     strip_control_chars,
 )
+from pdk.core.events import receipt_succeeded
 from pdk.core.knowledge import FixSuggestion, load_knowledge, lookup_fix
 
 console = Console()
@@ -76,7 +77,7 @@ def run(
                 severity="yellow",
             )
 
-    decoded = decode_receipt(receipt)
+    decoded = decode_receipt(receipt, substrate)
     if decoded is None:
         if json_out:
             typer.echo(jsonlib.dumps({"tx": str(tx_hash), "success": True}))
@@ -171,7 +172,7 @@ def _remediate(substrate, demo: bool, decoded: DecodedError, json_out: bool) -> 
         except Exception as exc:  # noqa: BLE001
             console.print(f"[red]Fix attempt failed: {str(exc)[:90]}[/red]")
             return
-        if receipt.is_success:
+        if receipt_succeeded(substrate, receipt):
             console.print(f"[green]✓ Fixed[/green] — the corrected transfer succeeded. "
                           f"tx: {receipt.extrinsic_hash}")
         else:
@@ -198,7 +199,7 @@ def _watch(substrate, json_out: bool) -> None:
             for number in range(last + 1, head_num + 1):
                 block_hash = substrate.get_block_hash(number)
                 for receipt in failed_receipts_in_block(substrate, block_hash):
-                    decoded = decode_receipt(receipt)
+                    decoded = decode_receipt(receipt, substrate)
                     if decoded is None:
                         continue
                     fix = lookup_fix(decoded, kb)

@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from substrateinterface import ExtrinsicReceipt, SubstrateInterface
 
 from pdk.config import RECENT_BLOCKS_SCAN
+from pdk.core.events import decode_block_events, receipt_succeeded
 
 # Strips ASCII control characters (0x00-0x1F, 0x7F) except \t and \n.
 # Doc comments are free-form Rust text with no syntax restriction, so a
@@ -53,13 +54,19 @@ class DecodedError:
         return f"{self.pallet.lower()}.{self.name}"
 
 
-def decode_receipt(receipt: ExtrinsicReceipt) -> DecodedError | None:
+def decode_receipt(receipt: ExtrinsicReceipt, substrate: SubstrateInterface | None = None) -> DecodedError | None:
     """Wrap a failed :class:`ExtrinsicReceipt` into a :class:`DecodedError`.
 
     Returns ``None`` if the extrinsic actually succeeded — there is nothing
     to debug in that case.
+
+    Pass ``substrate`` so the success check goes through
+    :func:`receipt_succeeded`, which survives Assets blocks that
+    ``receipt.is_success`` cannot decode. Omitting it keeps the plain
+    substrate-interface check, which is only safe when the caller already
+    knows the block holds no Assets amount events.
     """
-    if receipt.is_success:
+    if receipt_succeeded(substrate, receipt) if substrate is not None else receipt.is_success:
         return None
 
     # substrate-interface exposes the decoded error in the shape
@@ -100,13 +107,18 @@ def failed_receipts_in_block(
     Scans the block's events for ``System.ExtrinsicFailed``; for each, maps the
     event's ``extrinsic_idx`` back to the extrinsic and builds a receipt. Used by
     ``pdk debug --watch`` to surface failures as blocks are produced.
+
+    Reads events through :func:`pdk.core.events.decode_block_events` rather
+    than ``substrate.get_events``: the latter cannot decode any block
+    containing an Assets amount event on Portaldot's V13 metadata, so
+    ``watch``/``report`` would crash on the whole block — including the
+    unrelated failures in it — instead of reporting them.
     """
     receipts: list[ExtrinsicReceipt] = []
     block = None
-    for event in substrate.get_events(block_hash):
-        value = event.value if hasattr(event, "value") else event
-        if value.get("module_id") == "System" and value.get("event_id") == "ExtrinsicFailed":
-            idx = value.get("extrinsic_idx")
+    for event in decode_block_events(substrate, block_hash):
+        if event.pallet == "System" and event.name == "ExtrinsicFailed":
+            idx = event.extrinsic_idx
             if idx is None:
                 continue
             if block is None:
