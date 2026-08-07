@@ -50,7 +50,7 @@ const GROUPS: Group[] = [
       {cmd: 'pdk-ts send //Bob --amount 5 --dry-run', note: 'preview the fee + feasibility, submits nothing'},
       {cmd: 'pdk-ts fund //Bob', note: 'top up an account with POT from //Alice (default 100)'},
       {cmd: 'pdk-ts seed', note: 'fund accounts from a YAML fixtures file'},
-      {cmd: 'pdk-ts assets create 9001', note: 'sign an Assets pallet call — Python cannot do this on Portaldot'},
+      {cmd: 'pdk-ts assets create 9001', note: 'create a custom asset class, admin defaults to the signer'},
       {cmd: 'pdk-ts report --exit-code', note: 'exit 2 if any failure is found — CI gate'},
       {cmd: 'pdk-ts watch --pallet Balances', note: 'live-stream chain events, filtered to one pallet'},
     ],

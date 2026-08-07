@@ -1,7 +1,8 @@
 /**
  * assets' signing path is node-dependent and was verified live (create,
  * mint, transfer against a real Portaldot node, balances confirmed via
- * storage — the operation Python substrate-interface cannot sign at all).
+ * storage). Python could not sign these at all until pdk 0.2.0 root-caused
+ * the V13 `Balance` width ambiguity; the two CLIs are at parity now.
  * Here we lock the pure input validation that runs before any node call.
  */
 

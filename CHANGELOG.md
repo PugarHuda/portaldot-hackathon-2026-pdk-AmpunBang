@@ -51,6 +51,71 @@ here for repo-level chronology.
   `@polkadot/api` chain queries, shared KB parser reads Python's
   `error_fixes.yaml`. `doctor` verified against `wss://rpc.polkadot.io`.
 
+## [0.2.0] — 2026-08-07
+
+Closes the command-surface gap with `pdk-ts`, and with it the claim that
+Python "cannot sign Assets calls on Portaldot" — which this release makes
+false, deliberately. Two new commands (16 → 18) and the two encoding fixes
+that had to land first.
+
+### Added
+- **`pdk assets`** — `create` · `mint` · `transfer`. Mirrors `pdk-ts
+  assets` argument-for-argument. Verified live against a
+  `portaldot-1002` node, including a genuine `Assets.BalanceLow`
+  dispatch failure reporting as a failure (exit 1) rather than a crash
+  or a false success.
+- **`pdk call <pallet> <call> [args...]`** — generic extrinsic composer
+  over any pallet/call in live metadata, with discovery built in
+  (`pdk call <pallet>` lists calls and arg types; `pdk call <pallet>
+  <call>` shows one signature) and a `--dry-run` fee preview. Verified
+  live on `Balances.transfer`, `Assets.mint`, and `System.remark`.
+
+  Argument types are classified by asking the chain's own type registry
+  what each name resolves to, rather than matching a hand-kept list of
+  aliases. This runtime declares call arguments as `BalanceOf`,
+  `BlockNumber`, `EraIndex`, `Perbill`, `Weight`, `AccountIndex` and
+  more — all plain unsigned integers underneath, none of which look
+  numeric by name. Composites (`Call`, `Vec<T>`, `Option<T>`, structs)
+  are refused with a named error; a signing path never guesses an
+  encoding.
+
+### Fixed
+- **Assets amount events broke every block they appeared in.** V13
+  metadata declares the Assets pallet's amount fields as the bare name
+  `Balance`, which resolves globally to u128 while pallet-assets uses
+  u64. A block's events are one SCALE-encoded `Vec<EventRecord>` read
+  front to back, so the over-wide read desynchronised everything after
+  it and the decoder ran off the end of the buffer. `receipt.is_success`
+  and `substrate.get_events` both raised for any block containing an
+  `Assets.Issued`/`Transferred`/`Burned` event.
+
+  Blast radius went well past the Assets commands: `report` and `debug
+  --watch` read events for the whole block, so they crashed on *every*
+  failure in a block where any extrinsic happened to move an asset.
+  Fixed once at the shared read path (`pdk/core/events.py`), which walks
+  the vec and narrows only inside Assets events — a global override is
+  impossible, since one `Assets.mint` block carries both an
+  `Assets.Issued` (u64) and a `Treasury.Deposit` (u128), both declared
+  `Balance`.
+
+  `receipt_succeeded` never reads `receipt.is_success`, not even as a
+  fast path: substrate-interface caches partial state, so a property
+  that raised once returns a bare `False` on the next read. A
+  native-first design reported a successful mint as *failed*, caught
+  during live verification.
+- **Recipient resolution is now one helper** (`chain.resolve_account`)
+  shared by `send`, `assets`, and `call`. Git Bash rewrites `//Bob` to
+  `/Bob`, which derives a different valid keypair — applying the repair
+  on one path and forgetting it on another sends real value to an
+  address nobody controls.
+
+### Changed
+- README and `pdk-ts` docs no longer claim Assets signing as the reason
+  `pdk-ts` exists; that gap is closed. `pdk-ts`'s standing reason is now
+  stated plainly — a Node-native CLI and importable library for projects
+  that would rather not add a Python runtime.
+- Test suite 126 → 184 cases.
+
 ## [0.1.8] — 2026-07-12
 
 A hardening + correctness pass across the CLI surface, plus two new

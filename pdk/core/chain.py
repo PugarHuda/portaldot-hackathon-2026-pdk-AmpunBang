@@ -234,3 +234,20 @@ def free_balance(substrate: SubstrateInterface, address: str) -> float:
     """Return the free POT balance of an account."""
     account = substrate.query("System", "Account", [address])
     return int(account.value["data"]["free"]) / 10**POT_DECIMALS
+
+
+def resolve_account(source: str) -> str:
+    """Turn a recipient argument into an SS58 address.
+
+    Accepts a derivation URI (`//Bob`, and the shell-mangled `/Bob` /
+    bare `Bob` forms `normalise_account_uri` repairs) or an SS58 address,
+    which passes through untouched. Every command that takes a recipient
+    goes through here so the git-bash mangling repair can't be applied on
+    one path and forgotten on another — `//Bob` and `/Bob` derive
+    DIFFERENT valid keypairs, so forgetting it sends real value to an
+    address nobody controls.
+    """
+    normalised = normalise_account_uri(source)
+    if normalised.startswith("//") or "/" in normalised:
+        return Keypair.create_from_uri(normalised).ss58_address
+    return normalised
