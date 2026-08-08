@@ -1,7 +1,7 @@
 [project]
 name = "portaldot-pdk"
 version = "0.2.0"
-description = "Portaldot Dev Kit — Python CLI that decodes failed Portaldot transactions into named errors and fix steps. See also `pdk-ts` for the TypeScript companion covering signing surfaces Python cannot reach on V13 metadata."
+description = "Portaldot Dev Kit — Python CLI that decodes failed Portaldot transactions into named errors and fix steps. See also `pdk-ts`, the TypeScript companion with the same command surface."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -37,3 +37,19 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pdk"]
+
+# Without an explicit list, the sdist swept in the whole working tree —
+# `site/node_modules`, `site/.next`, `remotion/public`, and every demo
+# video, for a 72 MB upload of which none is source. An sdist is meant to
+# be the source needed to rebuild the wheel and run the tests; name that
+# exactly rather than excluding bloat one directory at a time, which
+# silently re-breaks the moment a new asset folder appears.
+[tool.hatch.build.targets.sdist]
+include = [
+    "/pdk",
+    "/tests",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE",
+    "/NOTICE",
+]
